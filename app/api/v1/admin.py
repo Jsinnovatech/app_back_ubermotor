@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
+from app.models.administrador import Administrador
 from app.schemas.conductor import ConductorOut
 from app.schemas.paquete import PaqueteCreate, PaqueteUpdate
 from app.schemas.recarga import PaqueteOut, RecargaOut
@@ -12,20 +13,16 @@ from app.services.admin_service import admin_service
 router = APIRouter(prefix="/admin", tags=["🛠️ Administración"])
 
 
-def _requiere_super_admin(usuario: UsuarioActual = Depends(requiere_tipo("administrador"))) -> UsuarioActual:
-    from app.models.administrador import Administrador
-    from sqlalchemy.orm import Session
-    from app.database import SessionLocal
+def _requiere_super_admin(
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("administrador")),
+) -> UsuarioActual:
     from app.core.exceptions import AuthorizationException
 
-    db = SessionLocal()
-    try:
-        admin = db.query(Administrador).filter(Administrador.usuario_id == usuario.usuario_id).first()
-        if not admin or admin.nivel != "super_admin":
-            raise AuthorizationException(message="Esta accion requiere ser super_admin")
-        return usuario
-    finally:
-        db.close()
+    admin = db.query(Administrador).filter(Administrador.usuario_id == usuario.usuario_id).first()
+    if not admin or admin.nivel != "super_admin":
+        raise AuthorizationException(message="Esta accion requiere ser super_admin")
+    return usuario
 
 
 @router.get("/conductores", response_model=list[ConductorOut])

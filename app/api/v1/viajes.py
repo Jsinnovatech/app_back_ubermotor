@@ -5,6 +5,7 @@ from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
+from app.models.viaje import Viaje
 from app.schemas.viaje import ViajeOut
 from app.services.viaje_service import viaje_service
 
@@ -32,13 +33,13 @@ def _conductor_de_usuario(db: Session, usuario_id: int) -> Conductor:
 @router.get("/disponibles", response_model=list[ViajeOut])
 async def viajes_disponibles(
     db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+    _usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
     """Viajes 'solicitado' que el conductor en linea puede aceptar."""
     return (
-        db.query(__import__("app.models.viaje", fromlist=["Viaje"]).Viaje)
-        .filter(__import__("app.models.viaje", fromlist=["Viaje"]).Viaje.estado == "solicitado")
-        .order_by(__import__("app.models.viaje", fromlist=["Viaje"]).Viaje.created_at.desc())
+        db.query(Viaje)
+        .filter(Viaje.estado == "solicitado")
+        .order_by(Viaje.created_at.desc())
         .all()
     )
 
