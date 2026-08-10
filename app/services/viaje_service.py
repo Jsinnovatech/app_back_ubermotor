@@ -1,3 +1,5 @@
+from math import asin, cos, radians, sin, sqrt
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -6,6 +8,15 @@ from app.models.cliente import Cliente
 from app.models.conductor import Conductor
 from app.models.viaje import Viaje
 from app.services.saldo_service import saldo_service
+
+
+def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Distancia Haversine en km entre dos coordenadas."""
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlng = radians(lng2 - lng1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    return R * 2 * asin(sqrt(a))
 
 
 class ViajeService:
@@ -125,6 +136,23 @@ class ViajeService:
         db.commit()
         db.refresh(viaje)
         return viaje
+
+    @staticmethod
+    def disponibles_cerca(
+        db: Session,
+        lat: float | None = None,
+        lng: float | None = None,
+        radio_km: float = 5.0,
+    ) -> list[Viaje]:
+        """Viajes 'solicitado'. Si el conductor manda su posicion, se filtran
+        por cercania del ORIGEN (Haversine) dentro del radio -> solo su zona."""
+        q = db.query(Viaje).filter(Viaje.estado == "solicitado").order_by(Viaje.created_at.desc())
+
+        if lat is None or lng is None:
+            return q.limit(50).all()
+
+        candidatos = q.limit(200).all()
+        return [v for v in candidatos if _distancia_km(lat, lng, v.origen_lat, v.origen_lng) <= radio_km]
 
     @staticmethod
     def historial_conductor(db: Session, conductor_id: int) -> list[Viaje]:

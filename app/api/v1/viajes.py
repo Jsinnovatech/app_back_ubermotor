@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
@@ -32,16 +32,16 @@ def _conductor_de_usuario(db: Session, usuario_id: int) -> Conductor:
 
 @router.get("/disponibles", response_model=list[ViajeOut])
 async def viajes_disponibles(
+    lat: float | None = Query(default=None, description="Latitud del conductor"),
+    lng: float | None = Query(default=None, description="Longitud del conductor"),
+    radio_km: float = Query(default=5.0, description="Radio de busqueda en km"),
     db: Session = Depends(get_db),
     _usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    """Viajes 'solicitado' que el conductor en linea puede aceptar."""
-    return (
-        db.query(Viaje)
-        .filter(Viaje.estado == "solicitado")
-        .order_by(Viaje.created_at.desc())
-        .all()
-    )
+    """Viajes 'solicitado' que el conductor puede aceptar. Si se pasan
+    lat/lng, solo devuelve los viajes cuyo ORIGEN esta dentro del radio
+    (Haversine) -> el conductor ve carreras de su zona, no de otros distritos."""
+    return viaje_service.disponibles_cerca(db, lat=lat, lng=lng, radio_km=radio_km)
 
 
 @router.post("/{viaje_id}/aceptar", response_model=ViajeOut)
