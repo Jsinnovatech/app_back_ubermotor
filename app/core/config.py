@@ -8,8 +8,14 @@ class Settings:
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 12  # turno largo: 12 horas
 
-    # CORS
-    ALLOWED_HOSTS: List[str] = ["*"]
+    # CORS: NO usar "*" con allow_credentials=True (el navegador lo rechaza).
+    # Lista explicita de origenes permitidos. En Railway se configura la
+    # variable CORS_ORIGINS separada por comas (default: front + localhost).
+    CORS_ORIGINS: List[str] = config(
+        "CORS_ORIGINS",
+        default="https://appfrontubermotor-production.up.railway.app,http://localhost:8080,http://localhost:3000",
+        cast=lambda v: [o.strip() for o in v.split(",") if o.strip()],
+    )
 
     # Tarifa mínima por carrera (soles) que el cliente le paga al conductor
     TARIFA_MINIMA_CARRERA: float = 3.0
