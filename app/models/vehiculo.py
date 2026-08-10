@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -16,3 +17,5 @@ class Vehiculo(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    conductor = relationship("Conductor", back_populates="vehiculo")
