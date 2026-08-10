@@ -61,6 +61,7 @@ def conductores_disponibles_cerca(
                 "modelo": vehiculo.modelo if vehiculo else None,
                 "placa": vehiculo.placa if vehiculo else None,
                 "color": vehiculo.color if vehiculo else None,
+                "foto_url": vehiculo.foto_url if vehiculo else None,
             },
         })
 

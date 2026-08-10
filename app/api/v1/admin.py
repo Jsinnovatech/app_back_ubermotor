@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
+from app.core.exceptions import NotFoundException, ValidationException
 from app.database import get_db
 from app.models.administrador import Administrador
+from app.models.conductor import Conductor
+from app.models.vehiculo import Vehiculo
 from app.schemas.conductor import ConductorOut
 from app.schemas.paquete import PaqueteCreate, PaqueteUpdate
 from app.schemas.recarga import PaqueteOut, RecargaOut
 from app.schemas.viaje import ViajeOut
 from app.services.admin_service import admin_service
+from app.services.storage.imagekit_service import imagekit_service
 
 router = APIRouter(prefix="/admin", tags=["🛠️ Administración"])
 
@@ -88,3 +92,69 @@ async def actualizar_paquete(
     _usuario: UsuarioActual = Depends(_requiere_super_admin),
 ):
     return admin_service.actualizar_paquete(db, paquete_id, datos)
+
+
+@router.post("/conductores/{conductor_id}/foto", response_model=ConductorOut)
+async def cargar_foto_conductor(
+    conductor_id: int,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _usuario: UsuarioActual = Depends(requiere_tipo("administrador")),
+):
+    """El admin sube/remplaza la foto de perfil del conductor."""
+    if not imagekit_service.disponible:
+        raise ValidationException(message="Storage no configurado (falta IMAGEKIT_PRIVATE_KEY)")
+    contenido = await archivo.read()
+    if not contenido:
+        raise ValidationException(message="Archivo vacio")
+
+    resultado = imagekit_service.subir(
+        file_content=contenido,
+        file_name=archivo.filename or "foto.jpg",
+        folder=f"hablavas/conductores/{conductor_id}",
+    )
+    if resultado is None:
+        raise ValidationException(message="No se pudo subir el archivo")
+
+    conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()
+    if not conductor:
+        raise NotFoundException(message="Conductor no encontrado")
+    conductor.foto_url = resultado.url
+    db.commit()
+    db.refresh(conductor)
+    return conductor
+
+
+@router.post("/conductores/{conductor_id}/moto-foto", response_model=ConductorOut)
+async def cargar_foto_moto(
+    conductor_id: int,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _usuario: UsuarioActual = Depends(requiere_tipo("administrador")),
+):
+    """El admin sube/remplaza la foto de la moto del conductor."""
+    if not imagekit_service.disponible:
+        raise ValidationException(message="Storage no configurado (falta IMAGEKIT_PRIVATE_KEY)")
+    contenido = await archivo.read()
+    if not contenido:
+        raise ValidationException(message="Archivo vacio")
+
+    resultado = imagekit_service.subir(
+        file_content=contenido,
+        file_name=archivo.filename or "moto.jpg",
+        folder=f"hablavas/conductores/{conductor_id}/moto",
+    )
+    if resultado is None:
+        raise ValidationException(message="No se pudo subir el archivo")
+
+    conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()
+    if not conductor:
+        raise NotFoundException(message="Conductor no encontrado")
+    vehiculo = db.query(Vehiculo).filter(Vehiculo.conductor_id == conductor_id).first()
+    if vehiculo is None:
+        vehiculo = Vehiculo(conductor_id=conductor_id)
+        db.add(vehiculo)
+    vehiculo.foto_url = resultado.url
+    db.commit()
+    db.refresh(conductor)
+    return conductor

@@ -13,6 +13,7 @@ class Vehiculo(Base):
     modelo = Column(String(50), nullable=True)
     placa = Column(String(15), nullable=True)
     color = Column(String(30), nullable=True)
+    foto_url = Column(String(500), nullable=True)
     soat_vencimiento = Column(Date, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

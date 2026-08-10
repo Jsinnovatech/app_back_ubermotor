@@ -38,9 +38,9 @@ async def subir_documento(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia | antecedentes.
-    El admin revisa los documentos y aprueba (aprobado)."""
-    tipos_validos = {"foto", "dni", "licencia", "antecedentes"}
+    """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia |
+    antecedentes | moto. El admin revisa y aprueba (aprobado)."""
+    tipos_validos = {"foto", "dni", "licencia", "antecedentes", "moto"}
     if tipo not in tipos_validos:
         raise ValidationException(message=f"tipo debe ser uno de: {', '.join(sorted(tipos_validos))}")
 
@@ -69,6 +69,14 @@ async def subir_documento(
     elif tipo == "antecedentes":
         conductor.antecedentes_foto_url = resultado.url
         conductor.antecedentes_valido = None  # pendiente de revision del admin
+    elif tipo == "moto":
+        vehiculo = conductor.vehiculo
+        if vehiculo is None:
+            from app.models.vehiculo import Vehiculo
+
+            vehiculo = Vehiculo(conductor_id=conductor.id)
+            db.add(vehiculo)
+        vehiculo.foto_url = resultado.url
 
     db.commit()
     db.refresh(conductor)
