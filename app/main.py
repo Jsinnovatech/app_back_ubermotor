@@ -13,6 +13,7 @@ from app.api.v1.admin import router as admin_router
 from app.api.v1.realtime import router as realtime_router
 from app.api.v1.sos import router as sos_router
 from app.api.v1.autoridades import router as autoridades_router
+from app.api.v1.calificaciones import router as calificaciones_router
 
 app = FastAPI(title="HablaVas API", version="0.1.0")
 
@@ -35,6 +36,7 @@ ROUTERS = [
     (realtime_router, "", None),  # WebSocket en /ws/conductores (sin /api/v1)
     (sos_router, "/api/v1", None),
     (autoridades_router, "/api/v1", None),
+    (calificaciones_router, "/api/v1", None),
 ]
 
 for router, prefix, tags in ROUTERS:
