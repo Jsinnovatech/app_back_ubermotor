@@ -25,6 +25,8 @@ class ViajeOut(BaseModel):
     origen_lng: float
     destino_lat: float
     destino_lng: float
+    origen_direccion: str | None = None
+    destino_direccion: str | None = None
     tarifa: float
     metodo_pago_cliente: str
 
