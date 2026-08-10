@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship
 
 from app.database import Base
 
-TIPOS_USUARIO = ("conductor", "cliente", "administrador")
+TIPOS_USUARIO = ("conductor", "cliente", "administrador", "serenazgo", "policia")
 
 
 class Usuario(Base):

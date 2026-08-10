@@ -1,6 +1,6 @@
 # Perfil 1:1 del conductor: extiende a Usuario. Tiene el saldo de carreras
 # prepagado (regla de negocio: vigencia diaria, no acumulable).
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -20,6 +20,10 @@ class Conductor(Base):
     # Antecedentes policiales / penales: el admin los revisa para aprobar.
     antecedentes_foto_url = Column(String(500), nullable=True)
     antecedentes_valido = Column(Boolean, nullable=True)
+    # Seguro obligatorio (SOAT / vehicular) para operar
+    seguro_aseguradora = Column(String(100), nullable=True)
+    seguro_poliza = Column(String(50), nullable=True)
+    seguro_vencimiento = Column(Date, nullable=True)
     rating_promedio = Column(Float, nullable=False, server_default="5.0")
     viajes_completados = Column(Integer, nullable=False, server_default="0")
     disponible = Column(Boolean, nullable=False, server_default="false")

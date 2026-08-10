@@ -33,6 +33,10 @@ class AuthService:
             db.add(Cliente(usuario_id=usuario.id, nombre=request.nombre))
         elif request.tipo_usuario == "administrador":
             db.add(Administrador(usuario_id=usuario.id, nombre=request.nombre))
+        elif request.tipo_usuario in ("serenazgo", "policia"):
+            # No tienen perfil 1:1: el nombre vive en la tabla usuarios (email
+            # como nombre base) y el rol decide que pantalla ven.
+            usuario.nombre = request.nombre
         else:
             raise AuthenticationException(message="Tipo de usuario invalido")
 
@@ -69,6 +73,8 @@ class AuthService:
         if usuario.tipo_usuario == "cliente":
             cliente = db.query(Cliente).filter(Cliente.usuario_id == usuario.id).first()
             return cliente.nombre if cliente else usuario.email
+        if usuario.tipo_usuario in ("serenazgo", "policia"):
+            return usuario.nombre or usuario.email
         admin = db.query(Administrador).filter(Administrador.usuario_id == usuario.id).first()
         return admin.nombre if admin else usuario.email
 

@@ -1,4 +1,5 @@
 from app.models.administrador import Administrador, NIVELES_ADMIN
+from app.models.alerta_sos import AlertaSOS, ESTADOS_SOS
 from app.models.calificacion import Calificacion
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
@@ -12,6 +13,8 @@ from app.models.viaje import Viaje, ESTADOS_VIAJE, CANCELADO_POR
 __all__ = [
     "Administrador",
     "NIVELES_ADMIN",
+    "AlertaSOS",
+    "ESTADOS_SOS",
     "Calificacion",
     "Cliente",
     "Conductor",
