@@ -31,6 +31,12 @@ class ConductorOut(BaseModel):
     id: int
     nombre: str
     dni: str | None = None
+    dni_foto_url: str | None = None
+    licencia: str | None = None
+    licencia_foto_url: str | None = None
+    foto_url: str | None = None
+    antecedentes_foto_url: str | None = None
+    antecedentes_valido: bool | None = None
     rating_promedio: float
     viajes_completados: int
     disponible: bool

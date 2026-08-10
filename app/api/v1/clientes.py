@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
@@ -7,7 +7,7 @@ from app.models.cliente import Cliente
 from app.schemas.auth import MensajeResponse
 from app.schemas.viaje import SolicitarViajeIn, ViajeOut
 from app.services.realtime_service import realtime_manager
-from app.services.viaje_service import viaje_service
+from app.services.viaje_service import conductores_disponibles_cerca, viaje_service
 
 router = APIRouter(prefix="/clientes", tags=["🙋 Clientes"])
 
@@ -19,6 +19,19 @@ def _cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
     if not cliente:
         raise NotFoundException(message="Perfil de cliente no encontrado")
     return cliente
+
+
+@router.get("/conductores-disponibles")
+async def conductores_disponibles(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    radio_km: float = Query(default=5.0),
+    db: Session = Depends(get_db),
+    _usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+):
+    """Motos disponibles cerca del cliente (conductor aprobado + disponible +
+    con saldo), con reputacion (rating, viajes) para decidir."""
+    return conductores_disponibles_cerca(db, lat, lng, radio_km)
 
 
 @router.post("/viajes", response_model=ViajeOut)

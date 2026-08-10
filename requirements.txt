@@ -7,3 +7,4 @@ python-decouple==3.8
 bcrypt==4.2.1
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.20
+imagekitio==3.2.0

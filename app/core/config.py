@@ -17,6 +17,11 @@ class Settings:
         cast=lambda v: [o.strip() for o in v.split(",") if o.strip()],
     )
 
+    # ImageKit (fotos y documentos del conductor)
+    IMAGEKIT_PUBLIC_KEY: str = config("IMAGEKIT_PUBLIC_KEY", default="")
+    IMAGEKIT_PRIVATE_KEY: str = config("IMAGEKIT_PRIVATE_KEY", default="")
+    IMAGEKIT_URL_ENDPOINT: str = config("IMAGEKIT_URL_ENDPOINT", default="")
+
     # Tarifa mínima por carrera (soles) que el cliente le paga al conductor
     TARIFA_MINIMA_CARRERA: float = 3.0
     # Rechazos del conductor que disparan el descuento de saldo

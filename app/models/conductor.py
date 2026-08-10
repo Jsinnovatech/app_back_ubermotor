@@ -13,8 +13,13 @@ class Conductor(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, unique=True, index=True)
     nombre = Column(String(150), nullable=False)
     dni = Column(String(12), nullable=True)
+    dni_foto_url = Column(String(500), nullable=True)
     licencia = Column(String(30), nullable=True)
+    licencia_foto_url = Column(String(500), nullable=True)
     foto_url = Column(String(500), nullable=True)
+    # Antecedentes policiales / penales: el admin los revisa para aprobar.
+    antecedentes_foto_url = Column(String(500), nullable=True)
+    antecedentes_valido = Column(Boolean, nullable=True)
     rating_promedio = Column(Float, nullable=False, server_default="5.0")
     viajes_completados = Column(Integer, nullable=False, server_default="0")
     disponible = Column(Boolean, nullable=False, server_default="false")

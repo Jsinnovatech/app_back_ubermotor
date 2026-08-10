@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, get_usuario_actual, UsuarioActual
+from app.core.exceptions import NotFoundException, ValidationException
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
@@ -17,17 +18,61 @@ from app.schemas.conductor import (
 from app.schemas.recarga import PaqueteOut, RecargaOut, ComprarRecargaIn
 from app.schemas.viaje import ViajeOut
 from app.services.saldo_service import saldo_service
+from app.services.storage.imagekit_service import imagekit_service
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/conductores", tags=["🛵 Conductores"])
 
 
 def _conductor_de_usuario(db: Session, usuario_id: int) -> Conductor:
-    from app.core.exceptions import NotFoundException
-
     conductor = db.query(Conductor).filter(Conductor.usuario_id == usuario_id).first()
     if not conductor:
         raise NotFoundException(message="Perfil de conductor no encontrado")
+    return conductor
+
+
+@router.post("/documentos", response_model=ConductorOut)
+async def subir_documento(
+    tipo: str,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia | antecedentes.
+    El admin revisa los documentos y aprueba (aprobado)."""
+    tipos_validos = {"foto", "dni", "licencia", "antecedentes"}
+    if tipo not in tipos_validos:
+        raise ValidationException(message=f"tipo debe ser uno de: {', '.join(sorted(tipos_validos))}")
+
+    if not imagekit_service.disponible:
+        raise ValidationException(message="Storage no configurado (falta IMAGEKIT_PRIVATE_KEY)")
+
+    contenido = await archivo.read()
+    if not contenido:
+        raise ValidationException(message="Archivo vacio")
+
+    resultado = imagekit_service.subir(
+        file_content=contenido,
+        file_name=archivo.filename or f"{tipo}.jpg",
+        folder=f"hablavas/conductores/{usuario.usuario_id}",
+    )
+    if resultado is None:
+        raise ValidationException(message="No se pudo subir el archivo")
+
+    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    if tipo == "foto":
+        conductor.foto_url = resultado.url
+    elif tipo == "dni":
+        conductor.dni_foto_url = resultado.url
+    elif tipo == "licencia":
+        conductor.licencia_foto_url = resultado.url
+    elif tipo == "antecedentes":
+        conductor.antecedentes_foto_url = resultado.url
+        conductor.antecedentes_valido = None  # pendiente de revision del admin
+
+    db.commit()
+    db.refresh(conductor)
+    conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
     return conductor
 
 

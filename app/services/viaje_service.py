@@ -7,6 +7,7 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
 from app.models.viaje import Viaje
+from app.models.vehiculo import Vehiculo
 from app.services.saldo_service import saldo_service
 
 
@@ -17,6 +18,54 @@ def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     dlng = radians(lng2 - lng1)
     a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
     return R * 2 * asin(sqrt(a))
+
+
+def conductores_disponibles_cerca(
+    db: Session,
+    lat: float,
+    lng: float,
+    radio_km: float = 5.0,
+) -> list[dict]:
+    """Conductores activos, aprobados, disponibles y CON SALDO, ordenados por
+    cercania. El cliente ve su ubicacion, moto y reputacion."""
+    conductores = (
+        db.query(Conductor)
+        .filter(
+            Conductor.aprobado.is_(True),
+            Conductor.disponible.is_(True),
+        )
+        .all()
+    )
+
+    resultado = []
+    for c in conductores:
+        if c.ubicacion_lat is None or c.ubicacion_lng is None:
+            continue
+        if saldo_service.saldo_actual(db, c.id) <= 0:
+            continue  # sin saldo no puede aceptar carreras hoy
+        d = _distancia_km(lat, lng, c.ubicacion_lat, c.ubicacion_lng)
+        if d > radio_km:
+            continue
+        vehiculo = db.query(Vehiculo).filter(Vehiculo.conductor_id == c.id).first()
+        resultado.append({
+            "conductor_id": c.id,
+            "nombre": c.nombre,
+            "foto_url": c.foto_url,
+            "rating_promedio": c.rating_promedio,
+            "viajes_completados": c.viajes_completados,
+            "ubicacion_lat": c.ubicacion_lat,
+            "ubicacion_lng": c.ubicacion_lng,
+            "distancia_km": round(d, 2),
+            "moto": {
+                "marca": vehiculo.marca if vehiculo else None,
+                "modelo": vehiculo.modelo if vehiculo else None,
+                "placa": vehiculo.placa if vehiculo else None,
+                "color": vehiculo.color if vehiculo else None,
+            },
+        })
+
+    resultado.sort(key=lambda x: x["distancia_km"])
+    return resultado
 
 
 class ViajeService:
