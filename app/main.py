@@ -10,8 +10,9 @@ from app.api.v1.clientes import router as clientes_router
 from app.api.v1.viajes import router as viajes_router
 from app.api.v1.recargas import router as recargas_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.realtime import router as realtime_router
 
-app = FastAPI(title="UberMotor API", version="0.1.0")
+app = FastAPI(title="HablaVas API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +30,7 @@ ROUTERS = [
     (viajes_router, "/api/v1", None),
     (recargas_router, "/api/v1", None),
     (admin_router, "/api/v1", None),
+    (realtime_router, "", None),  # WebSocket en /ws/conductores (sin /api/v1)
 ]
 
 for router, prefix, tags in ROUTERS:
