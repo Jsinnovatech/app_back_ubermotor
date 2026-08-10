@@ -65,7 +65,10 @@ Igual que Comanda, **no** creamos una tabla de login por rol. Hay **una sola tab
 | disponible | bool | en línea / fuera de línea |
 | ubicacion_lat / ubicacion_lng | decimal | posición en vivo |
 | cuenta_pago | json? | datos bancarios/wallet para cobrar (revisar PII) |
-| **saldo_carreras** | int | **saldo de carreras prepagadas (regla de negocio, ver §7)** |
+| **saldo_carreras** | int | saldo de carreras prepagadas (regla de negocio, ver §7) |
+| **saldo_fecha** | date | **día al que pertenece el saldo (vigencia diaria, §7)** |
+| **rechazos_hoy** | int | **contador de rechazos del día (regla del -1, §7)** |
+| rechazos_fecha | date | día al que pertenece el contador de rechazos |
 
 ### Vehículo (1:1 con conductor)
 
@@ -107,7 +110,7 @@ Igual que Comanda: **super_admin** (dueño de la plataforma) y **admin** (operad
 | id | PK | |
 | cliente_id | FK | |
 | conductor_id | FK | nullable hasta que se asigna |
-| estado | enum | `solicitado` \| `asignado` \| `en_curso` \| `completado` \| `cancelado` |
+| estado | enum | `solicitado` \| `asignado` \| `en_curso` \| `completado` \| `cancelado` \| `rechazado` |
 | cancelado_por | enum? | `cliente` \| `conductor` \| `admin` — **clave para la regla del saldo** |
 | origen_lat/lng | decimal | |
 | destino_lat/lng | decimal | |
@@ -126,7 +129,7 @@ Igual que Comanda: **super_admin** (dueño de la plataforma) y **admin** (operad
 | carreras | int | 5 / 10 / 20 |
 | metodo | enum | `yape` \| `efectivo` \| `wallet` |
 | estado | enum | `pendiente` \| `acreditado` \| `rechazado` |
-| fecha | datetime | |
+| fecha | datetime | **el saldo caduca al terminar este día (no acumulable)** |
 
 ### `paquetes_carreras` (catálogo, editable por admin)
 
@@ -178,7 +181,7 @@ Misma filosofía que Comanda:
 | `es_admin` / `tipo_colaborador` | Se convierte en `tipo_usuario` + `nivel` |
 | Rutas `app/api/v1/*` | `auth.py`, `viajes.py`, `conductores.py`, `clientes.py`, `admin.py`, `recargas.py` |
 | `ApiClient` (front) | Se copia tal cual |
-| Modelo de negocio: estados | `pendiente/listo/...` → `solicitado/asignado/en_curso/completado/cancelado` |
+| Modelo de negocio: estados | `pendiente/listo/...` → `solicitado/asignado/en_curso/completado/cancelado/rechazado` |
 
 ## 6. Referencia Mercado Pago (pagos)
 
@@ -187,7 +190,7 @@ Patrón tradicional que aplicamos:
 - Si integramos MP para las **recargas del conductor**, guardamos `referencia_externa` y el estado se actualiza por webhook.
 - La tabla `pagos`/`recargas` es la fuente única de verdad (sin estado calculado en memoria).
 
-## 7. Regla de negocio: saldo de carreras (prepago) — el corazón del negocio
+## 7. Regla de negocio: saldo de carreras (prepago diario) — el corazón del negocio
 
 **Modelo:** el conductor **compra carreras por adelantado** (recarga). El **cliente le paga directo al conductor** (Yape o efectivo) con tarifa mínima de **3 soles por carrera**. La plataforma gana con el **prepago** del conductor, no con comisión del viaje.
 
@@ -201,23 +204,32 @@ Patrón tradicional que aplicamos:
 
 > Precios pensados para ser **baratos y cómodos**; el catálogo vive en `paquetes_carreras` y el admin lo puede editar sin tocar código.
 
+### Vigencia: el saldo es POR DÍA, no acumulable
+
+- Las carreras compradas valen **solo el día de la recarga**.
+- Al terminar el día, el saldo que no se usó **se pierde** (no pasa al día siguiente, no se acumula).
+- Implementación: `conductores.saldo_carreras` + `saldo_fecha`. Si `saldo_fecha != hoy`, el saldo se trata como 0.
+- **Por qué:** obliga al conductor a recargar todos los días → recurrencia diaria garantizada, es la "magia" del negocio.
+
 ### Validaciones de la regla (sin agujeros)
 
 1. **Aceptar una carrera** → `conductores.saldo_carreras -= 1`.
 2. **El cliente cancela** → la carrera **se devuelve al saldo** (`saldo_carreras += 1`). No se pierde.
-3. **El conductor cancela** → la carrera **NO se devuelve** (evita abuso: nadie toma una carrera y la bota sin costo).
-4. `saldo_carreras == 0` → el conductor **no puede aceptar más carreras** hasta recargar. El front le avisa ("te quedan 2 carreras") y bloquea la aceptación.
-5. **Tarifa mínima 3 soles** → validada al crear el viaje (el cliente paga al conductor en Yape/efectivo).
-6. La recarga **solo se acredita cuando el pago se confirma** (estado `acreditado`).
+3. **El conductor rechaza 3 carreras** → se descuenta **1 carrera del saldo** (`saldo_carreras -= 1`, `rechazos_hoy` vuelve a 0). Por cada 3 rechazos, -1 saldo.
+4. **El conductor cancela una carrera YA aceptada** → cuenta como rechazo (aplica la regla de los 3).
+5. `saldo_carreras == 0` → el conductor **no puede aceptar más carreras** hasta recargar. El front le avisa ("te quedan 2 carreras") y bloquea la aceptación.
+6. **Tarifa mínima 3 soles** → validada al crear el viaje (el cliente paga al conductor en Yape/efectivo).
+7. La recarga **solo se acredita cuando el pago se confirma** (estado `acreditado`).
 
-### Flujo típico
+### Flujo típico (un día)
 
 ```
-1. Conductor recarga 4 soles (Yape) → paquete Clásico → saldo = 10
+1. Conductor recarga 4 soles (Yape) → paquete Clásico → saldo = 10 (vale solo HOY)
 2. Cliente pide un viaje, el conductor acepta → saldo = 9
 3. Viaje completado → el cliente le paga al conductor (Yape/efectivo, mínimo 3 soles)
 4. Cliente cancela a mitad → saldo vuelve a 10 (carrera devuelta)
-5. Saldo llega a 0 → el conductor recarga para seguir aceptando carreras
+5. Conductor rechaza 3 carreras seguidas → saldo = 9 (regla del -1)
+6. Termina el día → lo que sobra se pierde; mañana recarga de nuevo para operar
 ```
 
 ## 8. API inicial sugerida (`app/api/v1/`)
@@ -226,7 +238,7 @@ Patrón tradicional que aplicamos:
 - `conductores/` → perfil, disponibilidad, ubicación, **saldo_carreras**, aprobación (admin)
 - `recargas/` → listar paquetes, comprar paquete, confirmar pago, historial
 - `clientes/` → perfil, direcciones
-- `viajes/` → solicitar, asignar, estado, cancelar (con `cancelado_por`), historial
+- `viajes/` → solicitar, asignar, estado, cancelar (con `cancelado_por`), **rechazar**, historial
 - `pagos/` → crear, confirmar, historial
 - `admin/` → usuarios, zonas, reportes, aprobaciones, **catálogo de paquetes**
 
@@ -234,7 +246,8 @@ Patrón tradicional que aplicamos:
 
 - [x] **Regla de negocio:** prepago por saldo de carreras (2/4/8 soles → 5/10/20 carreras). **Confirmado.**
 - [x] **Cancelación del cliente** → se devuelve la carrera. **Confirmado.**
-- [ ] ¿El conductor cancela pierde la carrera siempre, o con tope de "X cancela al día"?
+- [x] **Rechazo del conductor** → cada 3 rechazos, -1 carrera de saldo. **Confirmado.**
+- [x] **Vigencia del saldo** → por día, no acumulable (se pierde al terminar el día). **Confirmado.**
 - [ ] ¿Integrar Mercado Pago para la recarga desde la v1 o solo Yape manual + validación por admin?
 - [ ] ¿PII de cuenta bancaria del conductor: cifrarla o delegarla a MP?
 - [ ] Definir umbrales de rating (bloqueo automático de conductores).
@@ -242,7 +255,7 @@ Patrón tradicional que aplicamos:
 
 ## 10. Siguiente paso sugerido
 
-1. Aprobar este modelo (3 perfiles + regla de saldo).
+1. Aprobar este modelo (3 perfiles + regla de saldo diario).
 2. Crear la estructura FastAPI (misma que Comanda: `app/models`, `app/schemas`, `app/api/v1`, `app/services`).
-3. Migraciones + tablas base (incluyendo `paquetes_carreras` y `recargas`).
+3. Migraciones + tablas base (incluyendo `paquetes_carreras`, `recargas` y los campos de saldo/rechazos del conductor).
 4. Flujo de auth por perfil + `_Portero` del front.
