@@ -120,7 +120,7 @@ class ViajeService:
     @staticmethod
     def rechazar(db: Session, viaje_id: int, conductor_id: int) -> Viaje:
         """El conductor rechaza: registra el rechazo (cada 3 -> -1 saldo) y
-        el viaje vuelve a quedar 'solicitado' para otro conductor."""
+        el viaje vuelve a quedar 'solicitado' para que otro conductor lo tome."""
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -128,7 +128,8 @@ class ViajeService:
             raise ValidationException(message="Este viaje ya no esta disponible")
 
         saldo_service.registrar_rechazo(db, conductor_id)
-        viaje.estado = "rechazado"
+        # Vuelve a 'solicitado' (sin conductor): la carrera sigue para otros.
+        viaje.conductor_id = None
         db.commit()
         db.refresh(viaje)
         return viaje

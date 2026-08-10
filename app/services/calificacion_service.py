@@ -45,16 +45,19 @@ class CalificacionService:
         cal = Calificacion(viaje_id=viaje_id, autor_id=autor_id, puntaje=puntaje, comentario=comentario)
         db.add(cal)
 
-        # Si el que califico es el cliente, el puntaje va al conductor (ranking).
+        # Calificacion mutua: si el cliente califica, el puntaje va al
+        # conductor (ranking); si el conductor califica, va al cliente.
         if es_cliente and conductor:
-            CalificacionService._recalcular_rating(db, conductor.id)
+            CalificacionService._recalcular_rating_conductor(db, conductor.id)
+        elif es_conductor and viaje.cliente_id:
+            CalificacionService._recalcular_rating_cliente(db, viaje.cliente_id)
 
         db.commit()
         db.refresh(cal)
         return cal
 
     @staticmethod
-    def _recalcular_rating(db: Session, conductor_id: int) -> None:
+    def _recalcular_rating_conductor(db: Session, conductor_id: int) -> None:
         conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()
         if not conductor:
             return
@@ -66,6 +69,20 @@ class CalificacionService:
         )
         if promedio is not None:
             conductor.rating_promedio = round(float(promedio), 1)
+
+    @staticmethod
+    def _recalcular_rating_cliente(db: Session, cliente_id: int) -> None:
+        cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+        if not cliente:
+            return
+        promedio = (
+            db.query(func.avg(Calificacion.puntaje))
+            .join(Viaje, Calificacion.viaje_id == Viaje.id)
+            .filter(Viaje.cliente_id == cliente_id)
+            .scalar()
+        )
+        if promedio is not None:
+            cliente.rating_promedio = round(float(promedio), 1)
 
     @staticmethod
     def ranking(db: Session, top: int = 20) -> list[dict]:

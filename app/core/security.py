@@ -9,9 +9,11 @@ import bcrypt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import AuthenticationException
+from app.database import get_db
 
 _bearer = HTTPBearer()
 
@@ -51,11 +53,23 @@ class UsuarioActual:
         self.tipo_usuario = tipo_usuario
 
 
-def get_usuario_actual(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> UsuarioActual:
+def get_usuario_actual(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> UsuarioActual:
     payload = SecurityService.verify_token(credentials.credentials)
+
+    # Valida que el usuario siga existiendo y activo en la BD (si fue
+    # bloqueado/desactivado, su token deja de valer de inmediato).
+    from app.models.usuario import Usuario
+
+    usuario = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
+    if not usuario or not usuario.activo:
+        raise AuthenticationException(message="Usuario desactivado o no existe")
+
     return UsuarioActual(
         usuario_id=int(payload["sub"]),
-        tipo_usuario=payload["tipo_usuario"],
+        tipo_usuario=usuario.tipo_usuario,
     )
 
 
