@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -34,7 +36,7 @@ class ConductorOut(BaseModel):
     disponible: bool
     aprobado: bool
     saldo_carreras: int
-    saldo_fecha: str | None = None
+    saldo_fecha: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -43,4 +45,4 @@ class ConductorOut(BaseModel):
 class SaldoOut(BaseModel):
     conductor_id: int
     saldo_carreras: int
-    saldo_fecha: str | None = None
+    saldo_fecha: datetime | None = None

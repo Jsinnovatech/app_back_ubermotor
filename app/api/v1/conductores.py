@@ -36,7 +36,11 @@ async def mi_perfil(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    return _conductor_de_usuario(db, usuario.usuario_id)
+    """Perfil del conductor. El saldo respeta la vigencia diaria (no acumulable):
+    si saldo_fecha es de otro dia, se reporta 0."""
+    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
+    return conductor
 
 
 @router.put("/perfil", response_model=ConductorOut)
