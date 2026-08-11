@@ -16,6 +16,9 @@ class Usuario(Base):
     email = Column(String(150), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
     telefono = Column(String(20), nullable=True)
+    # Nombre directo en la tabla base: conductor/cliente/admin lo tienen en su
+    # perfil 1:1, pero serenazgo/policia (sin perfil extra) lo guardan aca.
+    nombre = Column(String(150), nullable=True)
     tipo_usuario = Column(String(20), nullable=False, index=True)
     activo = Column(Boolean, nullable=False, server_default="true")
     verificado = Column(Boolean, nullable=False, server_default="false")
