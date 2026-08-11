@@ -230,14 +230,17 @@ class ViajeService:
         }
 
     @staticmethod
-    def historial_conductor(db: Session, conductor_id: int) -> list[Viaje]:
-        return (
+    def historial_conductor(db: Session, conductor_id: int) -> list[dict]:
+        """Viajes del conductor, con info del rider (nombre + rating + foto)
+        para mostrar en la tarjeta del historial (Rides)."""
+        viajes = (
             db.query(Viaje)
             .filter(Viaje.conductor_id == conductor_id)
             .order_by(Viaje.created_at.desc())
             .limit(50)
             .all()
         )
+        return [ViajeService._viaje_con_rider(db, v) for v in viajes]
 
     @staticmethod
     def historial_cliente(db: Session, cliente_id: int) -> list[Viaje]:

@@ -17,7 +17,7 @@ from app.schemas.conductor import (
     VehiculoIn,
 )
 from app.schemas.recarga import PaqueteOut, RecargaOut, ComprarRecargaIn
-from app.schemas.viaje import ViajeOut
+from app.schemas.viaje import ViajeConRiderOut
 from app.services.saldo_service import saldo_service
 from app.services.realtime_service import realtime_manager
 from app.services.storage.imagekit_service import imagekit_service
@@ -205,7 +205,7 @@ async def recargar(
     return saldo_service.comprar_recarga(db, conductor.id, datos.paquete_id, datos.metodo)
 
 
-@router.get("/historial", response_model=list[ViajeOut])
+@router.get("/historial", response_model=list[ViajeConRiderOut])
 async def historial(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
