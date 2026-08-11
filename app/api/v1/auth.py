@@ -3,7 +3,14 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_usuario_actual, UsuarioActual
 from app.database import get_db
-from app.schemas.auth import LoginRequest, LoginResponse, MensajeResponse, RegistroRequest
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    MensajeResponse,
+    RegistroRequest,
+    ResetearPasswordRequest,
+    SolicitarResetRequest,
+)
 from app.services.auth_service import auth_service
 
 router = APIRouter(prefix="/auth", tags=["🔐 Autenticación"])
@@ -19,6 +26,18 @@ async def registrar(request: RegistroRequest, db: Session = Depends(get_db)):
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Login por email+password para los tres perfiles."""
     return auth_service.login(db, request.email, request.password)
+
+
+@router.post("/solicitar-reset", response_model=MensajeResponse)
+async def solicitar_reset(request: SolicitarResetRequest, db: Session = Depends(get_db)):
+    """Envia un codigo de 6 digitos por correo para restablecer la contraseña."""
+    return auth_service.solicitar_reset_password(db, request.email)
+
+
+@router.post("/resetear-password", response_model=MensajeResponse)
+async def resetear_password(request: ResetearPasswordRequest, db: Session = Depends(get_db)):
+    """Confirma el codigo recibido por correo y establece la nueva contraseña."""
+    return auth_service.resetear_password(db, request.email, request.codigo, request.nueva_password)
 
 
 @router.get("/me", response_model=MensajeResponse)

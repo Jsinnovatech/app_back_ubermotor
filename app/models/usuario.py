@@ -23,6 +23,9 @@ class Usuario(Base):
     activo = Column(Boolean, nullable=False, server_default="true")
     verificado = Column(Boolean, nullable=False, server_default="false")
     refresh_token = Column(String(255), nullable=True)
+    # Reset de contraseña: codigo de un solo uso + expiracion (mismo patron que Comanda)
+    reset_code = Column(String(10), nullable=True)
+    reset_code_expira = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

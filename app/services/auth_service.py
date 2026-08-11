@@ -1,12 +1,18 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import AuthenticationException
+from app.core.exceptions import AuthenticationException, ValidationException
 from app.core.security import SecurityService
 from app.models.administrador import Administrador
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
 from app.models.usuario import Usuario
 from app.schemas.auth import RegistroRequest
+from app.services.email_service import email_service
+
+MINUTOS_VALIDEZ_RESET = 15
 
 
 class AuthService:
@@ -77,6 +83,41 @@ class AuthService:
             return usuario.nombre or usuario.email
         admin = db.query(Administrador).filter(Administrador.usuario_id == usuario.id).first()
         return admin.nombre if admin else usuario.email
+
+    @staticmethod
+    def solicitar_reset_password(db: Session, email: str) -> dict:
+        # Respuesta generica siempre, exista o no el email, para no revelar
+        # quien esta registrado (mismo criterio que Comanda/Casta de Gallos).
+        mensaje_generico = {"message": "Si el email existe, recibiras un codigo para restablecer tu contraseña"}
+
+        usuario = db.query(Usuario).filter(Usuario.email == email, Usuario.activo.is_(True)).first()
+        if not usuario:
+            return mensaje_generico
+
+        codigo = f"{secrets.randbelow(1_000_000):06d}"
+        usuario.reset_code = codigo
+        usuario.reset_code_expira = datetime.now(timezone.utc) + timedelta(minutes=MINUTOS_VALIDEZ_RESET)
+        db.commit()
+
+        nombre = AuthService._nombre_de_perfil(db, usuario)
+        email_service.send_reset_password(to_email=email, nombre=nombre, codigo=codigo)
+        return mensaje_generico
+
+    @staticmethod
+    def resetear_password(db: Session, email: str, codigo: str, nueva_password: str) -> dict:
+        usuario = db.query(Usuario).filter(Usuario.email == email, Usuario.activo.is_(True)).first()
+        if not usuario or usuario.reset_code != codigo:
+            raise ValidationException(message="Codigo invalido o expirado")
+
+        if not usuario.reset_code_expira or datetime.now(timezone.utc) > usuario.reset_code_expira:
+            raise ValidationException(message="Codigo invalido o expirado")
+
+        usuario.password_hash = SecurityService.hash_password(nueva_password)
+        usuario.reset_code = None
+        usuario.reset_code_expira = None
+        db.commit()
+
+        return {"message": "Contraseña actualizada exitosamente"}
 
 
 auth_service = AuthService()

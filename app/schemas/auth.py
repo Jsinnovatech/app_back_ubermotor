@@ -27,3 +27,13 @@ class LoginResponse(BaseModel):
 
 class MensajeResponse(BaseModel):
     message: str
+
+
+class SolicitarResetRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetearPasswordRequest(BaseModel):
+    email: EmailStr
+    codigo: str
+    nueva_password: str = Field(min_length=8, max_length=100)
