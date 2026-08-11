@@ -12,11 +12,15 @@ logger = logging.getLogger(__name__)
 
 class RealtimeManager:
     def __init__(self):
+        # conexiones de conductores (reciben carreras nuevas)
         self._conexiones: Dict[int, WebSocket] = {}
+        # conexiones de clientes (reciben la ubicacion en vivo del conductor)
+        self._clientes: Dict[int, WebSocket] = {}
 
-    async def conectar(self, conductor_id: int, websocket: WebSocket) -> None:
+    # ---------- Conductores ----------
+
+    async def conectar_conductor(self, conductor_id: int, websocket: WebSocket) -> None:
         await websocket.accept()
-        # Si el mismo conductor reconecta, cierra la vieja.
         previa = self._conexiones.pop(conductor_id, None)
         if previa is not None:
             try:
@@ -26,7 +30,7 @@ class RealtimeManager:
         self._conexiones[conductor_id] = websocket
         logger.info(f"Conductor {conductor_id} conectado al WS ({len(self._conexiones)} activos)")
 
-    def desconectar(self, conductor_id: int) -> None:
+    def desconectar_conductor(self, conductor_id: int) -> None:
         if self._conexiones.pop(conductor_id, None) is not None:
             logger.info(f"Conductor {conductor_id} desconectado del WS ({len(self._conexiones)} activos)")
 
@@ -41,8 +45,37 @@ class RealtimeManager:
             except Exception:
                 caidos.append(conductor_id)
         for conductor_id in caidos:
-            self.desconectar(conductor_id)
+            self.desconectar_conductor(conductor_id)
         return enviados
+
+    # ---------- Clientes (tracking en vivo) ----------
+
+    async def conectar_cliente(self, cliente_id: int, websocket: WebSocket) -> None:
+        await websocket.accept()
+        previa = self._clientes.pop(cliente_id, None)
+        if previa is not None:
+            try:
+                await previa.close()
+            except Exception:
+                pass
+        self._clientes[cliente_id] = websocket
+        logger.info(f"Cliente {cliente_id} conectado al WS ({len(self._clientes)} clientes)")
+
+    def desconectar_cliente(self, cliente_id: int) -> None:
+        if self._clientes.pop(cliente_id, None) is not None:
+            logger.info(f"Cliente {cliente_id} desconectado del WS ({len(self._clientes)} clientes)")
+
+    async def enviar_ubicacion_a_cliente(self, cliente_id: int, datos: dict) -> bool:
+        """Empuja la ubicacion del conductor al cliente de ese viaje (tracking)."""
+        ws = self._clientes.get(cliente_id)
+        if ws is None:
+            return False
+        try:
+            await ws.send_json(datos)
+            return True
+        except Exception:
+            self.desconectar_cliente(cliente_id)
+            return False
 
 
 realtime_manager = RealtimeManager()

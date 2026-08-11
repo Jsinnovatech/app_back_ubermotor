@@ -27,13 +27,41 @@ async def ws_conductores(websocket: WebSocket):
         return
 
     conductor_id = int(payload["sub"])
-    await realtime_manager.conectar(conductor_id, websocket)
+    await realtime_manager.conectar_conductor(conductor_id, websocket)
     try:
-        # El canal es de push: el conductor no envia mensajes, solo mantiene
-        # la conexion abierta. receive_text mantiene vivo el handler.
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        realtime_manager.desconectar(conductor_id)
+        realtime_manager.desconectar_conductor(conductor_id)
     except Exception:
-        realtime_manager.desconectar(conductor_id)
+        realtime_manager.desconectar_conductor(conductor_id)
+
+
+@router.websocket("/ws/clientes")
+async def ws_clientes(websocket: WebSocket):
+    """Conexion WebSocket del cliente: recibe la ubicacion en vivo del
+    conductor de su viaje activo (tracking en el mapa)."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4401, reason="Falta token")
+        return
+
+    try:
+        payload = SecurityService.verify_token(token)
+    except Exception:
+        await websocket.close(code=4401, reason="Token invalido")
+        return
+
+    if payload.get("tipo_usuario") != "cliente":
+        await websocket.close(code=4403, reason="Solo clientes")
+        return
+
+    cliente_id = int(payload["sub"])
+    await realtime_manager.conectar_cliente(cliente_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        realtime_manager.desconectar_cliente(cliente_id)
+    except Exception:
+        realtime_manager.desconectar_cliente(cliente_id)

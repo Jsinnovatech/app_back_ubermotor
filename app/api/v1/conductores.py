@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
 from app.models.usuario import Usuario
+from app.models.viaje import Viaje
 from app.schemas.conductor import (
     ConductorIn,
     ConductorOut,
@@ -18,6 +19,7 @@ from app.schemas.conductor import (
 from app.schemas.recarga import PaqueteOut, RecargaOut, ComprarRecargaIn
 from app.schemas.viaje import ViajeOut
 from app.services.saldo_service import saldo_service
+from app.services.realtime_service import realtime_manager
 from app.services.storage.imagekit_service import imagekit_service
 from app.services.viaje_service import viaje_service
 
@@ -148,6 +150,29 @@ async def actualizar_ubicacion(
     conductor.ubicacion_lat = datos.lat
     conductor.ubicacion_lng = datos.lng
     db.commit()
+
+    # Tracking en vivo: si el conductor tiene un viaje activo, empuja su
+    # ubicacion al cliente conectado por WebSocket (pin se mueve en el mapa).
+    viaje_activo = (
+        db.query(Viaje)
+        .filter(Viaje.conductor_id == conductor.id, Viaje.estado.in_(["asignado", "en_curso"]))
+        .order_by(Viaje.created_at.desc())
+        .first()
+    )
+    if viaje_activo:
+        cliente = db.query(Cliente).filter(Cliente.id == viaje_activo.cliente_id).first()
+        if cliente:
+            await realtime_manager.enviar_ubicacion_a_cliente(
+                cliente.usuario_id,
+                {
+                    "tipo": "ubicacion_conductor",
+                    "viaje_id": viaje_activo.id,
+                    "conductor_id": conductor.id,
+                    "lat": datos.lat,
+                    "lng": datos.lng,
+                },
+            )
+
     return {"message": "Ubicacion actualizada"}
 
 
