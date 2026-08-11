@@ -34,5 +34,14 @@ class ViajeOut(BaseModel):
         from_attributes = True
 
 
+class ViajeConRiderOut(ViajeOut):
+    """Viaje como lo ve el conductor: incluye quien es el rider (nombre y
+    puntuacion) para decidir si tomarlo."""
+
+    rider_nombre: str | None = None
+    rider_rating: float | None = None
+    rider_foto_url: str | None = None
+
+
 class CancelarViajeIn(BaseModel):
     motivo: str | None = None

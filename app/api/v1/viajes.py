@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
 from app.models.viaje import Viaje
-from app.schemas.viaje import ViajeOut
+from app.schemas.viaje import ViajeConRiderOut, ViajeOut
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/viajes", tags=["🛺 Viajes"])
@@ -30,7 +30,7 @@ def _conductor_de_usuario(db: Session, usuario_id: int) -> Conductor:
     return conductor
 
 
-@router.get("/disponibles", response_model=list[ViajeOut])
+@router.get("/disponibles", response_model=list[ViajeConRiderOut])
 async def viajes_disponibles(
     lat: float | None = Query(default=None, description="Latitud del conductor"),
     lng: float | None = Query(default=None, description="Longitud del conductor"),
@@ -38,9 +38,8 @@ async def viajes_disponibles(
     db: Session = Depends(get_db),
     _usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    """Viajes 'solicitado' que el conductor puede aceptar. Si se pasan
-    lat/lng, solo devuelve los viajes cuyo ORIGEN esta dentro del radio
-    (Haversine) -> el conductor ve carreras de su zona, no de otros distritos."""
+    """Viajes 'solicitado' con la info del rider (nombre + puntuacion). Si se
+    pasan lat/lng, solo devuelve los viajes cuyo ORIGEN esta dentro del radio."""
     return viaje_service.disponibles_cerca(db, lat=lat, lng=lng, radio_km=radio_km)
 
 

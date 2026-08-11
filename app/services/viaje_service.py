@@ -194,16 +194,40 @@ class ViajeService:
         lat: float | None = None,
         lng: float | None = None,
         radio_km: float = 5.0,
-    ) -> list[Viaje]:
-        """Viajes 'solicitado'. Si el conductor manda su posicion, se filtran
-        por cercania del ORIGEN (Haversine) dentro del radio -> solo su zona."""
+    ) -> list[dict]:
+        """Viajes 'solicitado' con info del rider (nombre + rating). Si el
+        conductor manda su posicion, se filtran por cercania del ORIGEN."""
         q = db.query(Viaje).filter(Viaje.estado == "solicitado").order_by(Viaje.created_at.desc())
 
         if lat is None or lng is None:
-            return q.limit(50).all()
+            candidatos = q.limit(50).all()
+        else:
+            todos = q.limit(200).all()
+            candidatos = [v for v in todos if _distancia_km(lat, lng, v.origen_lat, v.origen_lng) <= radio_km]
 
-        candidatos = q.limit(200).all()
-        return [v for v in candidatos if _distancia_km(lat, lng, v.origen_lat, v.origen_lng) <= radio_km]
+        return [ViajeService._viaje_con_rider(db, v) for v in candidatos]
+
+    @staticmethod
+    def _viaje_con_rider(db: Session, viaje: Viaje) -> dict:
+        """Serie el viaje incluyendo el nombre y la puntuacion del rider."""
+        cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()
+        return {
+            "id": viaje.id,
+            "cliente_id": viaje.cliente_id,
+            "conductor_id": viaje.conductor_id,
+            "estado": viaje.estado,
+            "origen_lat": viaje.origen_lat,
+            "origen_lng": viaje.origen_lng,
+            "destino_lat": viaje.destino_lat,
+            "destino_lng": viaje.destino_lng,
+            "origen_direccion": viaje.origen_direccion,
+            "destino_direccion": viaje.destino_direccion,
+            "tarifa": viaje.tarifa,
+            "metodo_pago_cliente": viaje.metodo_pago_cliente,
+            "rider_nombre": cliente.nombre if cliente else None,
+            "rider_rating": cliente.rating_promedio if cliente else None,
+            "rider_foto_url": cliente.foto_url if cliente else None,
+        }
 
     @staticmethod
     def historial_conductor(db: Session, conductor_id: int) -> list[Viaje]:
