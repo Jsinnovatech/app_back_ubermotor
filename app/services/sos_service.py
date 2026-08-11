@@ -35,10 +35,13 @@ class SosService:
         nombre_origen = usuario.email if usuario else None
         telefono_origen = usuario.telefono if usuario else None
         email_origen = usuario.email if usuario else None
+        foto_origen_url = None
         moto_descripcion = None
+        moto_foto_url = None
         seguro_descripcion = None
         contraparte_nombre = None
         contraparte_telefono = None
+        contraparte_foto_url = None
         contraparte_ubicacion_lat = None
         contraparte_ubicacion_lng = None
         viaje_id = None
@@ -47,6 +50,7 @@ class SosService:
             conductor = SosService._perfil_conductor(db, usuario_id)
             if conductor:
                 nombre_origen = conductor.nombre
+                foto_origen_url = conductor.foto_url
                 viaje = (
                     db.query(Viaje)
                     .filter(Viaje.conductor_id == conductor.id, Viaje.estado.in_(["asignado", "en_curso"]))
@@ -58,17 +62,20 @@ class SosService:
                     cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()
                     if cliente:
                         contraparte_nombre = cliente.nombre
+                        contraparte_foto_url = cliente.foto_url
                         c_user = db.query(Usuario).filter(Usuario.id == cliente.usuario_id).first()
                         contraparte_telefono = c_user.telefono if c_user else None
                 vehiculo = db.query(Vehiculo).filter(Vehiculo.conductor_id == conductor.id).first()
                 if vehiculo:
                     moto_descripcion = f"{vehiculo.marca or ''} {vehiculo.modelo or ''} {vehiculo.placa or ''}".strip()
+                    moto_foto_url = vehiculo.foto_url
                 if conductor.seguro_aseguradora:
                     seguro_descripcion = f"{conductor.seguro_aseguradora} {conductor.seguro_poliza or ''}".strip()
         else:  # cliente
             cliente = SosService._perfil_cliente(db, usuario_id)
             if cliente:
                 nombre_origen = cliente.nombre
+                foto_origen_url = cliente.foto_url
                 viaje = (
                     db.query(Viaje)
                     .filter(Viaje.cliente_id == cliente.id, Viaje.estado.in_(["asignado", "en_curso"]))
@@ -80,6 +87,7 @@ class SosService:
                     conductor = db.query(Conductor).filter(Conductor.id == viaje.conductor_id).first()
                     if conductor:
                         contraparte_nombre = conductor.nombre
+                        contraparte_foto_url = conductor.foto_url
                         contraparte_ubicacion_lat = conductor.ubicacion_lat
                         contraparte_ubicacion_lng = conductor.ubicacion_lng
                         c_user = db.query(Usuario).filter(Usuario.id == conductor.usuario_id).first()
@@ -87,6 +95,7 @@ class SosService:
                         vehiculo = db.query(Vehiculo).filter(Vehiculo.conductor_id == conductor.id).first()
                         if vehiculo:
                             moto_descripcion = f"{vehiculo.marca or ''} {vehiculo.modelo or ''} {vehiculo.placa or ''}".strip()
+                            moto_foto_url = vehiculo.foto_url
 
         alerta = AlertaSOS(
             origen=origen,
@@ -95,12 +104,15 @@ class SosService:
             nombre_origen=nombre_origen,
             telefono_origen=telefono_origen,
             email_origen=email_origen,
+            foto_origen_url=foto_origen_url,
             moto_descripcion=moto_descripcion,
+            moto_foto_url=moto_foto_url,
             seguro_descripcion=seguro_descripcion,
             ubicacion_lat=lat,
             ubicacion_lng=lng,
             contraparte_nombre=contraparte_nombre,
             contraparte_telefono=contraparte_telefono,
+            contraparte_foto_url=contraparte_foto_url,
             contraparte_ubicacion_lat=contraparte_ubicacion_lat,
             contraparte_ubicacion_lng=contraparte_ubicacion_lng,
         )

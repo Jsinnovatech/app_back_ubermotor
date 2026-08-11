@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
+from app.core.exceptions import NotFoundException, ValidationException
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.schemas.auth import MensajeResponse
 from app.schemas.viaje import SolicitarViajeIn, ViajeOut
 from app.services.realtime_service import realtime_manager
+from app.services.storage.imagekit_service import imagekit_service
 from app.services.viaje_service import conductores_disponibles_cerca, viaje_service
 
 router = APIRouter(prefix="/clientes", tags=["🙋 Clientes"])
@@ -73,3 +75,30 @@ async def historial(
 ):
     cliente = _cliente_de_usuario(db, usuario.usuario_id)
     return viaje_service.historial_cliente(db, cliente.id)
+
+
+@router.post("/foto", response_model=MensajeResponse)
+async def subir_foto(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+):
+    """El cliente sube su foto de perfil (la policia la ve en la Central SOS)."""
+    if not imagekit_service.disponible:
+        raise ValidationException(message="Storage no configurado")
+    contenido = await archivo.read()
+    if not contenido:
+        raise ValidationException(message="Archivo vacio")
+
+    resultado = imagekit_service.subir(
+        file_content=contenido,
+        file_name=archivo.filename or "foto.jpg",
+        folder=f"hablavas/clientes/{usuario.usuario_id}",
+    )
+    if resultado is None:
+        raise ValidationException(message="No se pudo subir el archivo")
+
+    cliente = _cliente_de_usuario(db, usuario.usuario_id)
+    cliente.foto_url = resultado.url
+    db.commit()
+    return {"message": "Foto de perfil actualizada"}
