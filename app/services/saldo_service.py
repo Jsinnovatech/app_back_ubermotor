@@ -37,6 +37,19 @@ class SaldoService:
         return conductor.saldo_carreras
 
     @staticmethod
+    def confirmar_recarga(db: Session, recarga_id: int, conductor_id: int) -> Recarga:
+        """Verifica que la recarga pertenezca al conductor y la acredita en el
+        saldo del dia. Devuelve la recarga confirmada."""
+        recarga = db.query(Recarga).filter(Recarga.id == recarga_id).first()
+        if not recarga:
+            raise NotFoundException(message="Recarga no encontrada")
+        if recarga.conductor_id != conductor_id:
+            raise NotFoundException(message="Recarga no encontrada")
+        SaldoService.acreditar_recarga(db, conductor_id)
+        db.refresh(recarga)
+        return recarga
+
+    @staticmethod
     def acreditar_recarga(db: Session, conductor_id: int) -> None:
         """Acredita el saldo de las recargas pendientes del dia (estado -> acreditado)."""
         conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()

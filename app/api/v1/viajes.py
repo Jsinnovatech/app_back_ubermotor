@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
 from app.models.cliente import Cliente
-from app.models.conductor import Conductor
 from app.models.viaje import Viaje
 from app.schemas.viaje import ViajeConRiderOut, ViajeOut
+from app.services.conductor_service import conductor_service
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/viajes", tags=["🛺 Viajes"])
@@ -19,15 +19,6 @@ def _cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
     if not cliente:
         raise NotFoundException(message="Perfil de cliente no encontrado")
     return cliente
-
-
-def _conductor_de_usuario(db: Session, usuario_id: int) -> Conductor:
-    from app.core.exceptions import NotFoundException
-
-    conductor = db.query(Conductor).filter(Conductor.usuario_id == usuario_id).first()
-    if not conductor:
-        raise NotFoundException(message="Perfil de conductor no encontrado")
-    return conductor
 
 
 @router.get("/disponibles", response_model=list[ViajeConRiderOut])
@@ -61,7 +52,7 @@ async def aceptar(
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
     """El conductor acepta: consume 1 carrera de su saldo (falla si saldo 0)."""
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.aceptar(db, viaje_id, conductor.id)
 
 
@@ -72,7 +63,7 @@ async def rechazar(
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
     """El conductor rechaza: cuenta para el descuento de 1 carrera cada 3 rechazos."""
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.rechazar(db, viaje_id, conductor.id)
 
 
@@ -93,7 +84,7 @@ async def llegar(
 ):
     """El conductor llego al punto de recogida: el viaje pasa a 'llegado' y el
     cliente ve 'Tu conductor esta esperando'."""
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.llegar(db, viaje_id, conductor.id)
 
 
@@ -119,5 +110,5 @@ async def cancelar(
     if usuario.tipo_usuario == "cliente":
         cliente = _cliente_de_usuario(db, usuario.usuario_id)
     else:
-        conductor = _conductor_de_usuario(db, usuario.usuario_id)
+        conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.cancelar(db, viaje_id, quien="cliente" if cliente else "conductor")

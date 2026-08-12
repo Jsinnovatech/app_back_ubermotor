@@ -1,36 +1,22 @@
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
-from app.core.security import requiere_tipo, get_usuario_actual, UsuarioActual
-from app.core.exceptions import NotFoundException, ValidationException
+from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
-from app.models.cliente import Cliente
-from app.models.conductor import Conductor
-from app.models.usuario import Usuario
-from app.models.viaje import Viaje
 from app.schemas.conductor import (
     ConductorIn,
     ConductorOut,
     DisponibilidadIn,
     SaldoOut,
     UbicacionIn,
-    VehiculoIn,
 )
 from app.schemas.recarga import PaqueteOut, RecargaOut, ComprarRecargaIn
 from app.schemas.viaje import ViajeConRiderOut
+from app.services.conductor_service import conductor_service
 from app.services.saldo_service import saldo_service
-from app.services.realtime_service import realtime_manager
-from app.services.storage.imagekit_service import imagekit_service
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/conductores", tags=["🛵 Conductores"])
-
-
-def _conductor_de_usuario(db: Session, usuario_id: int) -> Conductor:
-    conductor = db.query(Conductor).filter(Conductor.usuario_id == usuario_id).first()
-    if not conductor:
-        raise NotFoundException(message="Perfil de conductor no encontrado")
-    return conductor
 
 
 @router.post("/documentos", response_model=ConductorOut)
@@ -42,48 +28,7 @@ async def subir_documento(
 ):
     """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia |
     antecedentes | moto. El admin revisa y aprueba (aprobado)."""
-    tipos_validos = {"foto", "dni", "licencia", "antecedentes", "moto"}
-    if tipo not in tipos_validos:
-        raise ValidationException(message=f"tipo debe ser uno de: {', '.join(sorted(tipos_validos))}")
-
-    if not imagekit_service.disponible:
-        raise ValidationException(message="Storage no configurado (falta IMAGEKIT_PRIVATE_KEY)")
-
-    contenido = await archivo.read()
-    if not contenido:
-        raise ValidationException(message="Archivo vacio")
-
-    resultado = imagekit_service.subir(
-        file_content=contenido,
-        file_name=archivo.filename or f"{tipo}.jpg",
-        folder=f"hablavas/conductores/{usuario.usuario_id}",
-    )
-    if resultado is None:
-        raise ValidationException(message="No se pudo subir el archivo")
-
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
-    if tipo == "foto":
-        conductor.foto_url = resultado.url
-    elif tipo == "dni":
-        conductor.dni_foto_url = resultado.url
-    elif tipo == "licencia":
-        conductor.licencia_foto_url = resultado.url
-    elif tipo == "antecedentes":
-        conductor.antecedentes_foto_url = resultado.url
-        conductor.antecedentes_valido = None  # pendiente de revision del admin
-    elif tipo == "moto":
-        vehiculo = conductor.vehiculo
-        if vehiculo is None:
-            from app.models.vehiculo import Vehiculo
-
-            vehiculo = Vehiculo(conductor_id=conductor.id)
-            db.add(vehiculo)
-        vehiculo.foto_url = resultado.url
-
-    db.commit()
-    db.refresh(conductor)
-    conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
-    return conductor
+    return await conductor_service.subir_documento(db, usuario.usuario_id, tipo, archivo)
 
 
 @router.get("/perfil", response_model=ConductorOut)
@@ -93,7 +38,7 @@ async def mi_perfil(
 ):
     """Perfil del conductor. El saldo respeta la vigencia diaria (no acumulable):
     si saldo_fecha es de otro dia, se reporta 0."""
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
     return conductor
 
@@ -104,27 +49,7 @@ async def actualizar_perfil(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
-    conductor.nombre = datos.nombre
-    if datos.dni is not None:
-        conductor.dni = datos.dni
-    if datos.licencia is not None:
-        conductor.licencia = datos.licencia
-    if datos.vehiculo is not None:
-        v = datos.vehiculo
-        vehiculo = conductor.vehiculo
-        if vehiculo is None:
-            from app.models.vehiculo import Vehiculo
-
-            vehiculo = Vehiculo(conductor_id=conductor.id)
-            db.add(vehiculo)
-        vehiculo.marca = v.marca or vehiculo.marca
-        vehiculo.modelo = v.modelo or vehiculo.modelo
-        vehiculo.placa = v.placa or vehiculo.placa
-        vehiculo.color = v.color or vehiculo.color
-    db.commit()
-    db.refresh(conductor)
-    return conductor
+    return conductor_service.actualizar_perfil(db, usuario.usuario_id, datos)
 
 
 @router.put("/disponibilidad", response_model=ConductorOut)
@@ -133,11 +58,7 @@ async def cambiar_disponibilidad(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
-    conductor.disponible = datos.disponible
-    db.commit()
-    db.refresh(conductor)
-    return conductor
+    return conductor_service.cambiar_disponibilidad(db, usuario.usuario_id, datos.disponible)
 
 
 @router.put("/ubicacion")
@@ -146,33 +67,7 @@ async def actualizar_ubicacion(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
-    conductor.ubicacion_lat = datos.lat
-    conductor.ubicacion_lng = datos.lng
-    db.commit()
-
-    # Tracking en vivo: si el conductor tiene un viaje activo, empuja su
-    # ubicacion al cliente conectado por WebSocket (pin se mueve en el mapa).
-    viaje_activo = (
-        db.query(Viaje)
-        .filter(Viaje.conductor_id == conductor.id, Viaje.estado.in_(["asignado", "en_curso"]))
-        .order_by(Viaje.created_at.desc())
-        .first()
-    )
-    if viaje_activo:
-        cliente = db.query(Cliente).filter(Cliente.id == viaje_activo.cliente_id).first()
-        if cliente:
-            await realtime_manager.enviar_ubicacion_a_cliente(
-                cliente.usuario_id,
-                {
-                    "tipo": "ubicacion_conductor",
-                    "viaje_id": viaje_activo.id,
-                    "conductor_id": conductor.id,
-                    "lat": datos.lat,
-                    "lng": datos.lng,
-                },
-            )
-
+    await conductor_service.actualizar_ubicacion(db, usuario.usuario_id, datos.lat, datos.lng)
     return {"message": "Ubicacion actualizada"}
 
 
@@ -181,7 +76,7 @@ async def mi_saldo(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return {
         "conductor_id": conductor.id,
         "saldo_carreras": saldo_service.saldo_actual(db, conductor.id),
@@ -201,7 +96,7 @@ async def recargar(
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
     """Compra un paquete (2/4/8 soles). Queda 'pendiente' hasta confirmar el pago."""
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return saldo_service.comprar_recarga(db, conductor.id, datos.paquete_id, datos.metodo)
 
 
@@ -210,7 +105,7 @@ async def historial(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.historial_conductor(db, conductor.id)
 
 
@@ -221,5 +116,5 @@ async def viaje_activo(
 ):
     """El viaje en curso del conductor (asignado/llegado/en_curso). Si no tiene
     ninguno activo devuelve null. Lo usa el front para la pantalla de carrera."""
-    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.viaje_activo_de_conductor(db, conductor.id)
