@@ -102,12 +102,26 @@ class ViajeService:
 
     @staticmethod
     def aceptar(db: Session, viaje_id: int, conductor_id: int) -> Viaje:
-        """El conductor acepta: se consume 1 carrera de su saldo."""
+        """El conductor acepta: se consume 1 carrera de su saldo. Un conductor
+        solo puede tener UNA carrera activa (asignada o en curso) a la vez."""
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
         if viaje.estado != "solicitado":
             raise ValidationException(message="Este viaje ya no esta disponible")
+
+        tiene_activa = (
+            db.query(Viaje)
+            .filter(
+                Viaje.conductor_id == conductor_id,
+                Viaje.estado.in_(("asignado", "en_curso")),
+            )
+            .first()
+        )
+        if tiene_activa:
+            raise ValidationException(
+                message="Ya tienes una carrera en curso, completa la actual para aceptar otra"
+            )
 
         saldo_service.consumir_carrera(db, conductor_id)
 
