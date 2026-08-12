@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+
 from fastapi import UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
@@ -26,10 +29,27 @@ class ConductorService:
 
     @staticmethod
     def perfil_con_saldo(db: Session, usuario_id: int) -> Conductor:
-        """Perfil del conductor con el saldo vigente del dia (no acumulable)."""
+        """Perfil del conductor con el saldo vigente del dia (no acumulable) y
+        el ingreso acumulado (suma de tarifas) de los viajes completados hoy."""
         conductor = ConductorService.conductor_de_usuario(db, usuario_id)
         conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
+        conductor.ingreso_hoy = ConductorService._ingreso_de_hoy(db, conductor.id)
         return conductor
+
+    @staticmethod
+    def _ingreso_de_hoy(db: Session, conductor_id: int) -> float:
+        """Suma las tarifas de los viajes completados HOY por el conductor."""
+        inicio = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        total = (
+            db.query(func.coalesce(func.sum(Viaje.tarifa), 0.0))
+            .filter(
+                Viaje.conductor_id == conductor_id,
+                Viaje.estado == "completado",
+                Viaje.created_at >= inicio,
+            )
+            .scalar()
+        )
+        return float(total or 0.0)
 
     @staticmethod
     async def subir_documento(db: Session, usuario_id: int, tipo: str, archivo: UploadFile) -> Conductor:

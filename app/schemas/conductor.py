@@ -43,6 +43,7 @@ class ConductorOut(BaseModel):
     aprobado: bool
     saldo_carreras: int
     saldo_fecha: datetime | None = None
+    ingreso_hoy: float = 0.0
 
     class Config:
         from_attributes = True
