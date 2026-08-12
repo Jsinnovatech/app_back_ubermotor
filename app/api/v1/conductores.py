@@ -212,3 +212,14 @@ async def historial(
 ):
     conductor = _conductor_de_usuario(db, usuario.usuario_id)
     return viaje_service.historial_conductor(db, conductor.id)
+
+
+@router.get("/viaje-activo", response_model=ViajeConRiderOut | None)
+async def viaje_activo(
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """El viaje en curso del conductor (asignado/llegado/en_curso). Si no tiene
+    ninguno activo devuelve null. Lo usa el front para la pantalla de carrera."""
+    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    return viaje_service.viaje_activo_de_conductor(db, conductor.id)

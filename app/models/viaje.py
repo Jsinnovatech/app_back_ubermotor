@@ -5,7 +5,7 @@ from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, fun
 
 from app.database import Base
 
-ESTADOS_VIAJE = ("solicitado", "asignado", "en_curso", "completado", "cancelado", "rechazado")
+ESTADOS_VIAJE = ("solicitado", "asignado", "llegado", "en_curso", "completado", "cancelado", "rechazado")
 CANCELADO_POR = ("cliente", "conductor", "admin")
 
 

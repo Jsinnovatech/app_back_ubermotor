@@ -150,11 +150,27 @@ class ViajeService:
         return viaje
 
     @staticmethod
+    def llegar(db: Session, viaje_id: int, conductor_id: int) -> Viaje:
+        """El conductor puso 'Llegue': el viaje pasa a estado 'llegado' y el
+        cliente ve que su conductor ya esta esperando en el punto de recogida."""
+        viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
+        if not viaje:
+            raise NotFoundException(message="Viaje no encontrado")
+        if viaje.conductor_id != conductor_id:
+            raise ValidationException(message="Este viaje no te pertenece")
+        if viaje.estado != "asignado":
+            raise ValidationException(message="El viaje debe estar asignado para registrar la llegada")
+        viaje.estado = "llegado"
+        db.commit()
+        db.refresh(viaje)
+        return viaje
+
+    @staticmethod
     def iniciar(db: Session, viaje_id: int) -> Viaje:
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
-        if viaje.estado != "asignado":
+        if viaje.estado not in ("asignado", "llegado"):
             raise ValidationException(message="El viaje debe estar asignado para iniciar")
         viaje.estado = "en_curso"
         db.commit()
@@ -244,6 +260,28 @@ class ViajeService:
         }
 
     @staticmethod
+    def detalle(db: Session, viaje_id: int) -> dict:
+        """Estado actual de un viaje con la info del rider."""
+        viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
+        if not viaje:
+            raise NotFoundException(message="Viaje no encontrado")
+        return ViajeService._viaje_con_rider(db, viaje)
+
+    @staticmethod
+    def viaje_activo_de_conductor(db: Session, conductor_id: int) -> dict | None:
+        """Devuelve el viaje activo del conductor (asignado/llegado/en_curso)
+        con la info del rider, o None si no tiene ninguno."""
+        viaje = (
+            db.query(Viaje)
+            .filter(Viaje.conductor_id == conductor_id, Viaje.estado.in_(("asignado", "llegado", "en_curso")))
+            .order_by(Viaje.created_at.desc())
+            .first()
+        )
+        if viaje is None:
+            return None
+        return ViajeService._viaje_con_rider(db, viaje)
+
+    @staticmethod
     def historial_conductor(db: Session, conductor_id: int) -> list[dict]:
         """Viajes del conductor, con info del rider (nombre + rating + foto)
         para mostrar en la tarjeta del historial (Rides)."""
@@ -255,6 +293,45 @@ class ViajeService:
             .all()
         )
         return [ViajeService._viaje_con_rider(db, v) for v in viajes]
+
+    @staticmethod
+    def viaje_activo_de_cliente(db: Session, cliente_id: int) -> dict | None:
+        """Devuelve el viaje en curso del cliente con los datos del conductor
+        (nombre, moto, rating, foto) para la pantalla de seguimiento."""
+        viaje = (
+            db.query(Viaje)
+            .filter(Viaje.cliente_id == cliente_id, Viaje.estado.in_(("asignado", "llegado", "en_curso")))
+            .order_by(Viaje.created_at.desc())
+            .first()
+        )
+        if viaje is None:
+            return None
+        return ViajeService._viaje_con_conductor(db, viaje)
+
+    @staticmethod
+    def _viaje_con_conductor(db: Session, viaje: Viaje) -> dict:
+        """Serie el viaje incluyendo los datos del conductor que el cliente ve
+        en la pantalla de seguimiento (quien lo esta llevando)."""
+        conductor = None
+        vehiculo = None
+        if viaje.conductor_id is not None:
+            conductor = db.query(Conductor).filter(Conductor.id == viaje.conductor_id).first()
+            vehiculo = db.query(Vehiculo).filter(Vehiculo.conductor_id == conductor.id).first() if conductor else None
+
+        base = ViajeService._viaje_con_rider(db, viaje)
+        base.update(
+            {
+                "conductor_nombre": conductor.nombre if conductor else None,
+                "conductor_rating": conductor.rating_promedio if conductor else None,
+                "conductor_foto_url": conductor.foto_url if conductor else None,
+                "moto_descripcion": (vehiculo.marca + " " + vehiculo.modelo).strip()
+                if vehiculo and vehiculo.marca
+                else None,
+                "moto_placa": vehiculo.placa if vehiculo else None,
+                "moto_foto_url": vehiculo.foto_url if vehiculo else None,
+            }
+        )
+        return base
 
     @staticmethod
     def historial_cliente(db: Session, cliente_id: int) -> list[Viaje]:

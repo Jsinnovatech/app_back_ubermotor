@@ -67,6 +67,17 @@ async def historial(
     return viaje_service.historial_cliente(db, cliente.id)
 
 
+@router.get("/viaje-activo")
+async def viaje_activo_cliente(
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+):
+    """El viaje en curso del cliente (asignado/llegado/en_curso) con los datos
+    del conductor (nombre, moto, rating, foto) para la pantalla de seguimiento."""
+    cliente = _cliente_de_usuario(db, usuario.usuario_id)
+    return viaje_service.viaje_activo_de_cliente(db, cliente.id)
+
+
 @router.post("/foto", response_model=MensajeResponse)
 async def subir_foto(
     archivo: UploadFile = File(...),

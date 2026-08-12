@@ -25,6 +25,9 @@ class Settings:
     # SOS: webhook al sistema de Serenazgo/Policia. Mientras no haya endpoint
     # real, se deja vacio y la alerta queda registrada en la BD.
     POLICIA_WEBHOOK_URL: str = config("POLICIA_WEBHOOK_URL", default="")
+    # Credenciales del webhook externo (Basic Auth: usuario + clave).
+    POLICIA_WEBHOOK_USUARIO: str = config("POLICIA_WEBHOOK_USUARIO", default="")
+    POLICIA_WEBHOOK_CLAVE: str = config("POLICIA_WEBHOOK_CLAVE", default="")
     SOS_CONFIRMACIONES: int = 2  # veces que se presiona el boton para activar
 
     # Tarifa mínima por carrera (soles) que el cliente le paga al conductor

@@ -43,6 +43,17 @@ async def viajes_disponibles(
     return viaje_service.disponibles_cerca(db, lat=lat, lng=lng, radio_km=radio_km)
 
 
+@router.get("/{viaje_id}", response_model=ViajeConRiderOut)
+async def detalle_viaje(
+    viaje_id: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
+):
+    """Estado actual de un viaje (lo usa el cliente en el seguimiento y el
+    conductor para refrescar la carrera en curso)."""
+    return viaje_service.detalle(db, viaje_id)
+
+
 @router.post("/{viaje_id}/aceptar", response_model=ViajeOut)
 async def aceptar(
     viaje_id: int,
@@ -72,6 +83,18 @@ async def iniciar(
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
     return viaje_service.iniciar(db, viaje_id)
+
+
+@router.post("/{viaje_id}/llegar", response_model=ViajeOut)
+async def llegar(
+    viaje_id: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """El conductor llego al punto de recogida: el viaje pasa a 'llegado' y el
+    cliente ve 'Tu conductor esta esperando'."""
+    conductor = _conductor_de_usuario(db, usuario.usuario_id)
+    return viaje_service.llegar(db, viaje_id, conductor.id)
 
 
 @router.post("/{viaje_id}/completar", response_model=ViajeOut)
