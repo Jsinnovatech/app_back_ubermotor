@@ -3,11 +3,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
-from app.core.exceptions import NotFoundException
 from app.database import get_db
 from app.models.alerta_sos import AlertaSOS
-from app.models.conductor import Conductor
-from app.models.viaje import Viaje
+from app.services.sos_service import sos_service
 
 router = APIRouter(prefix="/autoridades", tags=["👮 Serenazgo / Policia"])
 
@@ -51,12 +49,7 @@ async def listar_alertas(
     """Serenazgo/Policia ven las alertas SOS activas con todos los datos:
     quien pidio ayuda, la contraparte, la moto (con foto), el seguro y la
     ubicacion."""
-    return (
-        db.query(AlertaSOS)
-        .filter(AlertaSOS.estado == estado)
-        .order_by(AlertaSOS.created_at.desc())
-        .all()
-    )
+    return sos_service.listar_alertas(db, estado=estado)
 
 
 @router.get("/alertas/{alerta_id}/ubicacion-vivo", response_model=UbicacionVivoOut)
@@ -67,16 +60,4 @@ async def ubicacion_vivo(
 ):
     """Posicion ACTUAL del conductor de la alerta (para seguir la moto en
     movimiento en el mapa de la policia)."""
-    alerta = db.query(AlertaSOS).filter(AlertaSOS.id == alerta_id).first()
-    if not alerta or not alerta.viaje_id:
-        raise NotFoundException(message="Alerta sin viaje activo")
-
-    viaje = db.query(Viaje).filter(Viaje.id == alerta.viaje_id).first()
-    if not viaje or not viaje.conductor_id:
-        raise NotFoundException(message="Alerta sin conductor asignado")
-
-    conductor = db.query(Conductor).filter(Conductor.id == viaje.conductor_id).first()
-    if not conductor or conductor.ubicacion_lat is None:
-        raise NotFoundException(message="Conductor sin ubicacion registrada")
-
-    return UbicacionVivoOut(conductor_id=conductor.id, lat=conductor.ubicacion_lat, lng=conductor.ubicacion_lng)
+    return UbicacionVivoOut(**sos_service.ubicacion_vivo_conductor(db, alerta_id))

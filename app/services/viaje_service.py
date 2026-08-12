@@ -78,6 +78,14 @@ class ViajeService:
     """
 
     @staticmethod
+    def cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
+        """Resuelve el perfil de cliente de un usuario autenticado."""
+        cliente = db.query(Cliente).filter(Cliente.usuario_id == usuario_id).first()
+        if not cliente:
+            raise NotFoundException(message="Perfil de cliente no encontrado")
+        return cliente
+
+    @staticmethod
     def solicitar(db: Session, cliente_id: int, datos) -> Viaje:
         viaje = Viaje(
             cliente_id=cliente_id,
@@ -351,6 +359,17 @@ class ViajeService:
             .limit(50)
             .all()
         )
+
+    @staticmethod
+    def subir_foto_cliente(db: Session, cliente_id: int, url: str) -> Cliente:
+        """Guarda la URL de la foto de perfil del cliente (la policia la ve en
+        la Central SOS)."""
+        cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+        if not cliente:
+            raise NotFoundException(message="Perfil de cliente no encontrado")
+        cliente.foto_url = url
+        db.commit()
+        return cliente
 
 
 viaje_service = ViajeService()

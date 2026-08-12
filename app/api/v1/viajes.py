@@ -13,12 +13,7 @@ router = APIRouter(prefix="/viajes", tags=["🛺 Viajes"])
 
 
 def _cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
-    from app.core.exceptions import NotFoundException
-
-    cliente = db.query(Cliente).filter(Cliente.usuario_id == usuario_id).first()
-    if not cliente:
-        raise NotFoundException(message="Perfil de cliente no encontrado")
-    return cliente
+    return viaje_service.cliente_de_usuario(db, usuario_id)
 
 
 @router.get("/disponibles", response_model=list[ViajeConRiderOut])

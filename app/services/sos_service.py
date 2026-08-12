@@ -163,5 +163,39 @@ class SosService:
         db.refresh(alerta)
         return alerta
 
+    @staticmethod
+    def listar_alertas(db: Session, estado: str = "activa") -> list[AlertaSOS]:
+        """Alertas SOS por estado (activa/atendida) para la Central de la policia."""
+        return (
+            db.query(AlertaSOS)
+            .filter(AlertaSOS.estado == estado)
+            .order_by(AlertaSOS.created_at.desc())
+            .all()
+        )
+
+    @staticmethod
+    def ubicacion_vivo_conductor(db: Session, alerta_id: int) -> dict:
+        """Posicion ACTUAL del conductor de la alerta (para seguir la moto en
+        movimiento en el mapa de la policia)."""
+        from app.core.exceptions import NotFoundException
+
+        alerta = db.query(AlertaSOS).filter(AlertaSOS.id == alerta_id).first()
+        if not alerta or not alerta.viaje_id:
+            raise NotFoundException(message="Alerta sin viaje activo")
+
+        viaje = db.query(Viaje).filter(Viaje.id == alerta.viaje_id).first()
+        if not viaje or not viaje.conductor_id:
+            raise NotFoundException(message="Alerta sin conductor asignado")
+
+        conductor = db.query(Conductor).filter(Conductor.id == viaje.conductor_id).first()
+        if not conductor or conductor.ubicacion_lat is None:
+            raise NotFoundException(message="Conductor sin ubicacion registrada")
+
+        return {
+            "conductor_id": conductor.id,
+            "lat": conductor.ubicacion_lat,
+            "lng": conductor.ubicacion_lng,
+        }
+
 
 sos_service = SosService()

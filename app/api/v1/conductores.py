@@ -38,9 +38,7 @@ async def mi_perfil(
 ):
     """Perfil del conductor. El saldo respeta la vigencia diaria (no acumulable):
     si saldo_fecha es de otro dia, se reporta 0."""
-    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
-    conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
-    return conductor
+    return conductor_service.perfil_con_saldo(db, usuario.usuario_id)
 
 
 @router.put("/perfil", response_model=ConductorOut)

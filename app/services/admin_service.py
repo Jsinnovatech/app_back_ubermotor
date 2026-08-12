@@ -5,6 +5,7 @@ from app.models.conductor import Conductor
 from app.models.paquete_carrera import PaqueteCarrera
 from app.models.recarga import Recarga
 from app.models.usuario import Usuario
+from app.models.vehiculo import Vehiculo
 from app.models.viaje import Viaje
 
 
@@ -82,6 +83,33 @@ class AdminService:
         if estado:
             q = q.filter(Viaje.estado == estado)
         return q.limit(100).all()
+
+    @staticmethod
+    def subir_foto_conductor(db: Session, conductor_id: int, url: str) -> Conductor:
+        """Guarda la URL de la foto de perfil del conductor subida por el admin."""
+        conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()
+        if not conductor:
+            raise NotFoundException(message="Conductor no encontrado")
+        conductor.foto_url = url
+        db.commit()
+        db.refresh(conductor)
+        return conductor
+
+    @staticmethod
+    def subir_foto_moto(db: Session, conductor_id: int, url: str) -> Conductor:
+        """Guarda la URL de la foto de la moto del conductor. Crea el vehiculo si
+        aun no existe."""
+        conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()
+        if not conductor:
+            raise NotFoundException(message="Conductor no encontrado")
+        vehiculo = db.query(Vehiculo).filter(Vehiculo.conductor_id == conductor_id).first()
+        if vehiculo is None:
+            vehiculo = Vehiculo(conductor_id=conductor_id)
+            db.add(vehiculo)
+        vehiculo.foto_url = url
+        db.commit()
+        db.refresh(conductor)
+        return conductor
 
 
 admin_service = AdminService()

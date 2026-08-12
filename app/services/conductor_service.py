@@ -25,6 +25,13 @@ class ConductorService:
         return conductor
 
     @staticmethod
+    def perfil_con_saldo(db: Session, usuario_id: int) -> Conductor:
+        """Perfil del conductor con el saldo vigente del dia (no acumulable)."""
+        conductor = ConductorService.conductor_de_usuario(db, usuario_id)
+        conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
+        return conductor
+
+    @staticmethod
     async def subir_documento(db: Session, usuario_id: int, tipo: str, archivo: UploadFile) -> Conductor:
         """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia |
         antecedentes | moto. El admin revisa y aprueba (aprobado)."""

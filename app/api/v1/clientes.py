@@ -15,12 +15,7 @@ router = APIRouter(prefix="/clientes", tags=["🙋 Clientes"])
 
 
 def _cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
-    from app.core.exceptions import NotFoundException
-
-    cliente = db.query(Cliente).filter(Cliente.usuario_id == usuario_id).first()
-    if not cliente:
-        raise NotFoundException(message="Perfil de cliente no encontrado")
-    return cliente
+    return viaje_service.cliente_de_usuario(db, usuario_id)
 
 
 @router.get("/conductores-disponibles")
@@ -99,6 +94,5 @@ async def subir_foto(
         raise ValidationException(message="No se pudo subir el archivo")
 
     cliente = _cliente_de_usuario(db, usuario.usuario_id)
-    cliente.foto_url = resultado.url
-    db.commit()
+    viaje_service.subir_foto_cliente(db, cliente.id, resultado.url)
     return {"message": "Foto de perfil actualizada"}

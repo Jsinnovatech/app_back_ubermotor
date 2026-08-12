@@ -5,9 +5,8 @@ from sqlalchemy.orm import Session
 from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
 from app.models.alerta_sos import AlertaSOS
-from app.models.cliente import Cliente
-from app.models.conductor import Conductor
 from app.schemas.auth import MensajeResponse
+from app.services.conductor_service import conductor_service
 from app.services.sos_service import sos_service
 
 router = APIRouter(prefix="/sos", tags=["🆘 SOS"])
@@ -29,7 +28,7 @@ class SosOut(BaseModel):
 
 
 def _es_conductor(db: Session, usuario_id: int) -> bool:
-    return db.query(Conductor).filter(Conductor.usuario_id == usuario_id).first() is not None
+    return conductor_service.conductor_de_usuario(db, usuario_id) is not None
 
 
 @router.post("", response_model=SosOut)
