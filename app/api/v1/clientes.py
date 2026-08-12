@@ -6,6 +6,7 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.schemas.auth import MensajeResponse
+from app.schemas.cliente import ClienteOut
 from app.schemas.viaje import SolicitarViajeIn, ViajeOut
 from app.services.realtime_service import realtime_manager
 from app.services.storage.imagekit_service import imagekit_service
@@ -16,6 +17,16 @@ router = APIRouter(prefix="/clientes", tags=["🙋 Clientes"])
 
 def _cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
     return viaje_service.cliente_de_usuario(db, usuario_id)
+
+
+@router.get("/perfil", response_model=ClienteOut)
+async def mi_perfil(
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+):
+    """Perfil del cliente (nombre, foto, viajes, rating) para la pestana Cuenta."""
+    cliente = _cliente_de_usuario(db, usuario.usuario_id)
+    return viaje_service.perfil_cliente(db, cliente.id)
 
 
 @router.get("/conductores-disponibles")

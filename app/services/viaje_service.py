@@ -371,5 +371,23 @@ class ViajeService:
         db.commit()
         return cliente
 
+    @staticmethod
+    def perfil_cliente(db: Session, cliente_id: int) -> dict:
+        """Perfil del cliente con los datos que ve en la pestana Cuenta."""
+        cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+        if not cliente:
+            raise NotFoundException(message="Perfil de cliente no encontrado")
+        from app.models.usuario import Usuario
+
+        usuario = db.query(Usuario).filter(Usuario.id == cliente.usuario_id).first()
+        return {
+            "id": cliente.id,
+            "nombre": cliente.nombre,
+            "email": usuario.email if usuario else None,
+            "foto_url": cliente.foto_url,
+            "viajes_realizados": cliente.viajes_realizados,
+            "rating_promedio": cliente.rating_promedio,
+        }
+
 
 viaje_service = ViajeService()
