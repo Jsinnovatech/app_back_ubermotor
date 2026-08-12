@@ -238,6 +238,15 @@ class ViajeService:
         return [ViajeService._viaje_con_rider(db, v) for v in candidatos]
 
     @staticmethod
+    def serializar_para_push(db: Session, viaje: Viaje) -> dict:
+        """Payload del push por WebSocket a los conductores: el viaje completo
+        con rider (id, origen, destino, tarifa). El router no debe tocar los
+        serializadores privados."""
+        payload = ViajeService._viaje_con_rider(db, viaje)
+        payload["tipo"] = "viaje_nuevo"
+        return payload
+
+    @staticmethod
     def _viaje_con_rider(db: Session, viaje: Viaje) -> dict:
         """Serie el viaje incluyendo el nombre y la puntuacion del rider."""
         cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()

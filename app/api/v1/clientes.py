@@ -48,8 +48,7 @@ async def solicitar_viaje(
     viaje = viaje_service.solicitar(db, cliente.id, datos)
 
     try:
-        payload = viaje_service._viaje_con_rider(db, viaje)
-        payload["tipo"] = "viaje_nuevo"
+        payload = viaje_service.serializar_para_push(db, viaje)
         await realtime_manager.notificar_viaje(payload)
     except Exception:
         # Si falla el push, el polling del front sigue siendo el fallback.
