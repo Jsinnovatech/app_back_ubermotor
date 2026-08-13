@@ -13,6 +13,8 @@ Configura:
 
 Si no defines las variables, el script las pide por consola.
 """
+import base64
+import mimetypes
 import os
 import sys
 
@@ -34,7 +36,7 @@ if not RESEND_API_KEY:
 
 
 # ── 2. El email ───────────────────────────────────────────────────
-ASUNTO = "🛵 HablaVas — Correo de prueba con Resend"
+ASUNTO = "🛵 HablaVas — Correo de prueba con Resend (con adjuntos)"
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -69,7 +71,33 @@ HTML = """
 """
 
 
-# ── 3. Envio ──────────────────────────────────────────────────────
+# ── 3. Adjuntos (opcional) ────────────────────────────────────────
+# Pasa la ruta de un archivo en ADJUNTOS (separados por coma) y se envia
+# como base64. Ejemplo:
+#   ADJUNTOS="diagramas/HablaVas_diagramas.docx,ARQUITECTURA_BACKEND.md"
+ADJUNTOS = os.getenv("ADJUNTOS", "").split(",")
+
+
+def _adjuntos_payload() -> list[dict]:
+    """Convierte las rutas en la lista 'attachments' que espera Resend."""
+    payload = []
+    for ruta in ADJUNTOS:
+        ruta = ruta.strip()
+        if not ruta or not os.path.exists(ruta):
+            continue
+        with open(ruta, "rb") as f:
+            contenido = f.read()
+        nombre = os.path.basename(ruta)
+        mime, _ = mimetypes.guess_type(ruta)
+        payload.append({
+            "filename": nombre,
+            "content": base64.b64encode(contenido).decode(),
+            "content_type": mime or "application/octet-stream",
+        })
+    return payload
+
+
+# ── 4. Envio ──────────────────────────────────────────────────────
 def main() -> None:
     resend.api_key = RESEND_API_KEY
 
@@ -77,13 +105,20 @@ def main() -> None:
     print(f"De: {EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>")
     print(f"Asunto: {ASUNTO}")
 
+    adjuntos = _adjuntos_payload()
+    if adjuntos:
+        print(f"Adjuntos: {[a['filename'] for a in adjuntos]}")
+
     try:
-        response = resend.Emails.send({
+        mensaje = {
             "from": f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>",
             "to": [CORREO_DESTINO],
             "subject": ASUNTO,
             "html": HTML,
-        })
+        }
+        if adjuntos:
+            mensaje["attachments"] = adjuntos
+        response = resend.Emails.send(mensaje)
         print(f"\n✅ Email enviado. ID: {response.get('id')}")
     except Exception as e:
         print(f"\n❌ Error al enviar: {e}")
