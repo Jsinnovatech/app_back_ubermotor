@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HablaVas — Diagramas de Secuencia</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --amarillo: #F5B800;
+      --negro: #141414;
+      --gris: #F5F5F2;
+      --verde: #22A45D;
+      --azul: #007AFF;
+      --rojo: #E5484D;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--gris);
+      color: var(--negro);
+      padding: 24px;
+    }
+    header {
+      background: var(--negro);
+      color: var(--amarillo);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 { font-size: 28px; font-weight: 900; }
+    header p { color: #fff; font-size: 14px; opacity: .9; }
+    .nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .nav button {
+      background: #fff;
+      border: 2px solid var(--negro);
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .nav button:hover { background: var(--amarillo); }
+    .nav button.activo { background: var(--negro); color: var(--amarillo); }
+    section { display: none; }
+    section.visible { display: block; }
+    .card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+    .card h2 { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
+    .card .sub { color: #888; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
+    .card h3 {
+      font-size: 15px; font-weight: 800; margin: 16px 0 8px;
+      color: var(--azul); text-transform: uppercase; letter-spacing: .5px;
+    }
+    .mermaid { display: flex; justify-content: center; padding: 8px 0; }
+    code {
+      background: var(--gris); border: 1px solid #e0e0e0;
+      border-radius: 6px; padding: 2px 6px; font-size: 13px;
+    }
+    .nota {
+      background: #FFF9E0; border-left: 4px solid var(--amarillo);
+      padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0;
+      font-size: 13px; line-height: 1.5;
+    }
+    .legenda {
+      display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 12px;
+    }
+    .pill { padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; color: #fff; }
+    .solicitado { background: var(--amarillo); color: #141414; }
+    .asignado { background: var(--azul); }
+    .llegado { background: #F59E0B; }
+    .encurso { background: var(--verde); }
+    .completado { background: var(--verde); }
+    .rechazado { background: var(--rojo); }
+    .regla {
+      display: inline-block; background: var(--negro); color: var(--amarillo);
+      padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 13px; margin: 4px 4px 0 0;
+    }
+    footer { text-align: center; color: #888; font-size: 12px; margin-top: 32px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛵 HablaVas — Diagramas de Secuencia</h1>
+    <p>Flujo completo de una carrera, saldo, SOS y recuperación de contraseña</p>
+  </div>
+  <div class="legenda">
+    <span class="pill solicitado">solicitado</span>
+    <span class="pill asignado">asignado</span>
+    <span class="pill llegado">llegado</span>
+    <span class="pill encurso">en_curso</span>
+    <span class="pill completado">completado</span>
+    <span class="pill rechazado">cancelado/rechazado</span>
+  </div>
+</header>
+
+<div class="nav">
+  <button class="activo" data-sec="flujo">1 · Carrera completa</button>
+  <button data-sec="saldo">2 · Saldo prepago</button>
+  <button data-sec="escenarios">3 · Escenarios tóxicos</button>
+  <button data-sec="sos">4 · SOS / Policía</button>
+  <button data-sec="calificacion">5 · Calificación</button>
+  <button data-sec="reset">6 · Recuperar contraseña</button>
+  <button data-sec="realtime">7 · Realtime</button>
+</div>
+
+<!-- ═══════════ 1 · FLUJO COMPLETO ═══════════ -->
+<section id="flujo" class="visible">
+  <div class="card">
+    <h2>🚀 Flujo completo de una carrera</h2>
+    <p class="sub">Cliente pide → conductor acepta → llega → inicia → completa → califican</p>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor C as 👤 Cliente
+    participant B as ⚙️ Backend
+    participant W as ⚡ WebSocket
+    actor D as 🛵 Conductor
+
+    C->>B: POST /clientes/viajes (origen, destino, tarifa S/3+, yape/efectivo)
+    B->>B: estado = <b>solicitado</b>
+    B->>W: empuja viaje_nuevo (con id + rider)
+    W-->>D: 🔔 Panel "Nueva carrera" (Aceptar/Rechazar, 15s)
+    D->>B: POST /viajes/{id}/aceptar
+    Note over B: valida: viaje en solicitado + sin otra carrera activa + saldo &gt; 0
+    B->>B: estado = <b>asignado</b>, saldo -= 1
+    B-->>C: WS ubicacion → "Tu conductor está en camino"
+    D->>B: PUT /conductores/ubicacion (cada 5s)
+    B-->>C: 🔵 pin del conductor se mueve en vivo
+    D->>B: POST /viajes/{id}/llegar
+    B->>B: estado = <b>llegado</b>
+    B-->>C: 🟡 "Tu conductor llegó, sube al moto"
+    D->>B: POST /viajes/{id}/iniciar
+    B->>B: estado = <b>en_curso</b>
+    B-->>C: 🟢 "En viaje a tu destino"
+    D->>B: POST /viajes/{id}/completar
+    B->>B: estado = <b>completado</b>, viajes_completados += 1
+    B-->>C: ✅ "Llegaste, califica a tu conductor"
+    C->>B: POST /calificaciones (1-5 ⭐)
+    B->>B: rating_promedio del conductor se recalcula
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 2 · SALDO ═══════════ -->
+<section id="saldo">
+  <div class="card">
+    <h2>💰 Saldo prepago diario</h2>
+    <p class="sub">La plataforma gana con el prepago de carreras (0.40/carrera)</p>
+
+    <h3>Compra de paquetes</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    D->>B: GET /recargas/paquetes
+    B-->>D: 2 = 5 | 4 = 10 | 8 = 20 carreras
+    D->>B: POST /recargas/comprar (paquete 4, yape)
+    B->>B: recarga = pendiente
+    D->>B: POST /recargas/{id}/confirmar
+    B->>B: acreditar: saldo_fecha = hoy, saldo += carreras
+    B-->>D: saldo = 10 carreras (solo HOY)
+    </div>
+
+    <h3>Consumo al aceptar</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    D->>B: POST /viajes/{id}/aceptar
+    B->>B: ¿saldo &gt; 0? (si 0 → "Sin saldo, recarga un paquete")
+    B->>B: saldo -= 1 → 9
+    B-->>D: viaje asignado ✅
+    </div>
+    <div class="nota">
+      <b>No acumulable:</b> si saldo_fecha es de otro día, el saldo se reporta 0.
+      El conductor recarga cada día que quiere trabajar.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 3 · ESCENARIOS TÓXICOS ═══════════ -->
+<section id="escenarios">
+  <div class="card">
+    <h2>⚠️ Escenarios tóxicos</h2>
+    <p class="sub">Reglas de negocio para proteger a las partes</p>
+
+    <h3>Cliente cancela → se devuelve el saldo</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor C as 👤 Cliente
+    participant B as ⚙️ Backend
+    actor D as 🛵 Conductor
+
+    C->>B: POST /viajes/{id}/cancelar (quien = cliente)
+    B->>B: estado = cancelado
+    B->>B: si había conductor → saldo += 1 (se devuelve)
+    B-->>D: carrera cancelada, saldo restaurado
+    </div>
+
+    <h3>Cada 3 rechazos → -1 saldo</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    loop 3 veces
+        D->>B: POST /viajes/{id}/rechazar
+        B->>B: registra rechazo, viaje vuelve a solicitado (para otro conductor)
+    end
+    B->>B: al 3er rechazo → saldo -= 1
+    B-->>D: ⚠️ "Has perdido 1 carrera por 3 rechazos"
+    </div>
+
+    <h3>Conductor con carrera activa no acepta otra</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    D->>B: POST /viajes/{id}/aceptar (mientras tiene asignado/llegado/en_curso)
+    B->>B: detecta carrera activa
+    B-->>D: ❌ "Ya tienes una carrera en curso, completa la actual"
+    </div>
+
+    <h3>Saldo 0 → no puede aceptar</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    D->>B: POST /viajes/{id}/aceptar
+    B->>B: saldo = 0
+    B-->>D: ❌ "Sin saldo de carreras para hoy. Recarga un paquete"
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 4 · SOS ═══════════ -->
+<section id="sos">
+  <div class="card">
+    <h2>🚨 SOS → Central de Policía</h2>
+    <p class="sub">Doble toque del botón → alerta con todos los datos → webhook externo</p>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor U as 🛵 Conductor / 👤 Cliente
+    participant B as ⚙️ Backend
+    actor P as 👮 Policía/Serenazgo
+    participant W as 🌐 Webhook externo
+
+    U->>B: POST /sos (doble toque: lat, lng)
+    B->>B: registra alerta (origen, foto, moto, seguro, contraparte, ubicación)
+    B->>W: POST webhook (con Basic Auth usuario+clave)
+    W-->>B: 200 OK
+    loop cada 5s
+        P->>B: GET /autoridades/alertas?estado=activa
+        B-->>P: 🔴 alerta SOS activa con datos
+        P->>B: GET /alertas/{id}/ubicacion-vivo
+        B-->>P: 📍 moto moviéndose en el mapa (cada 3s)
+    end
+    P->>B: POST /sos/{id}/cerrar
+    B->>B: estado = atendida
+    </div>
+    <div class="nota">
+      El webhook <code>POLICIA_WEBHOOK_URL</code> es el sistema externo de la policía.
+      Si no está configurado, la alerta queda igual registrada en la BD y la ven
+      los perfiles policía/serenazgo en la Central SOS.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 5 · CALIFICACIÓN ═══════════ -->
+<section id="calificacion">
+  <div class="card">
+    <h2>⭐ Calificación mutua</h2>
+    <p class="sub">Después de completar el viaje, ambos se califican 1-5</p>
+    <div class="grid2">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor C as 👤 Cliente
+    participant B as ⚙️ Backend
+
+    C->>B: viaje completado → botón "CALIFICAR CONDUCTOR"
+    C->>B: POST /calificaciones (viaje, 5 ⭐)
+    B->>B: guarda + recalcula rating del conductor
+    B-->>C: ✅ "Calificación registrada"
+    </div>
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    D->>B: viaje completado → botón "Calificar rider"
+    D->>B: POST /calificaciones (viaje, 4 ⭐)
+    B->>B: guarda + recalcula rating del cliente
+    B-->>D: ✅ "Calificación registrada"
+    </div>
+    </div>
+    <h3>Ranking</h3>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor U as 👤 Usuario
+    participant B as ⚙️ Backend
+
+    U->>B: GET /calificaciones/ranking?top=10
+    B->>B: ordena conductores por rating_promedio
+    B-->>U: 🏆 top conductores con estrellas
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 6 · RECUPERAR CONTRASEÑA ═══════════ -->
+<section id="reset">
+  <div class="card">
+    <h2>🔑 Recuperación de contraseña</h2>
+    <p class="sub">Código de 6 dígitos por email (Resend), vigencia 15 min</p>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor U as 👤 Usuario
+    participant B as ⚙️ Backend
+    participant E as ✉️ Resend
+
+    U->>B: POST /auth/solicitar-reset (email)
+    B->>B: genera código de 6 dígitos (15 min)
+    B->>E: envía correo con el código
+    E-->>U: 📧 "Tu código: 123456"
+    U->>B: POST /auth/resetear-password (email, código, nueva pass)
+    B->>B: valida código y vigencia
+    B->>B: actualiza password_hash
+    B-->>U: ✅ "Contraseña actualizada"
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 7 · REALTIME ═══════════ -->
+<section id="realtime">
+  <div class="card">
+    <h2>⚡ WebSockets (patrón InDrive)</h2>
+    <p class="sub">Conexión abierta permanente: el backend empuja, no espera polling</p>
+    <div class="grid2">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as 🛵 Conductor
+    participant B as ⚙️ Backend
+
+    D->>B: WS /ws/conductores?token=JWT
+    B-->>D: conexión abierta (permanente)
+    Note over B: llega una carrera nueva
+    B-->>D: 🔔 {tipo: viaje_nuevo, id, rider}
+    D->>B: aceptar/rechazar
+    </div>
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor C as 👤 Cliente
+    participant B as ⚙️ Backend
+    actor D as 🛵 Conductor
+
+    C->>B: WS /ws/clientes?token=JWT
+    B-->>C: conexión abierta (permanente)
+    D->>B: PUT /conductores/ubicacion
+    B-->>C: 📍 {tipo: ubicacion_conductor, lat, lng}
+    Note over C: el pin de la moto se mueve en vivo
+    </div>
+    </div>
+    <div class="nota">
+      <b>Fallback:</b> si el WS se cae, el polling de 5s del front sigue funcionando.
+      Los WebSocket se autentican con <code>?token=</code> en la URL (Flutter web no
+      envía headers de forma fiable).
+    </div>
+  </div>
+</section>
+
+<footer>
+  HablaVas · Backend FastAPI · Diagramas Mermaid de los flujos de negocio
+</footer>
+
+<script>
+  document.querySelectorAll('.nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav button').forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+      document.querySelectorAll('section').forEach(s => s.classList.remove('visible'));
+      document.getElementById(btn.dataset.sec).classList.add('visible');
+    });
+  });
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#F5B800',
+      primaryTextColor: '#141414',
+      primaryBorderColor: '#141414',
+      lineColor: '#888',
+      actorBkg: '#F5B800',
+      actorBorder: '#141414',
+      actorTextColor: '#141414',
+      sequenceNumberColor: '#007AFF',
+    },
+    sequence: { mirrorActors: false, showSequenceNumbers: true },
+  });
+</script>
+</body>
+</html>
