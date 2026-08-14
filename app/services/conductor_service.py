@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundException, ValidationException
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
+from app.models.documento_conductor import CARAS_DOCUMENTO, DocumentoConductor, TIPOS_DOCUMENTO
 from app.models.vehiculo import Vehiculo
 from app.models.viaje import Viaje
 from app.schemas.conductor import ConductorIn
@@ -14,7 +15,7 @@ from app.services.realtime_service import realtime_manager
 from app.services.saldo_service import saldo_service
 from app.services.storage.imagekit_service import imagekit_service
 
-TIPOS_DOCUMENTO = {"foto", "dni", "licencia", "antecedentes", "moto"}
+TIPOS_DOCUMENTO = {"foto", "dni", "brevete", "soat", "moto"}
 
 
 class ConductorService:
@@ -52,13 +53,15 @@ class ConductorService:
         return float(total or 0.0)
 
     @staticmethod
-    async def subir_documento(db: Session, usuario_id: int, tipo: str, archivo: UploadFile) -> Conductor:
-        """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia |
-        antecedentes | moto. El admin revisa y aprueba (aprobado)."""
+    async def subir_documento(db: Session, usuario_id: int, tipo: str, cara: str | None, archivo: UploadFile) -> Conductor:
+        """Sube un documento del conductor a ImageKit y lo guarda en la tabla
+        documentos_conductores (tipo + cara). El admin los revisa y aprueba."""
         if tipo not in TIPOS_DOCUMENTO:
             raise ValidationException(
                 message=f"tipo debe ser uno de: {', '.join(sorted(TIPOS_DOCUMENTO))}"
             )
+        if tipo in ("dni", "brevete") and cara not in CARAS_DOCUMENTO:
+            raise ValidationException(message="cara debe ser: frente o dorso")
 
         if not imagekit_service.disponible:
             raise ValidationException(message="Storage no configurado (falta IMAGEKIT_PRIVATE_KEY)")
@@ -69,33 +72,56 @@ class ConductorService:
 
         resultado = imagekit_service.subir(
             file_content=contenido,
-            file_name=archivo.filename or f"{tipo}.jpg",
-            folder=f"hablavas/conductores/{usuario_id}",
+            file_name=archivo.filename or f"{tipo}_{cara}.jpg",
+            folder=f"hablavas/conductores/{usuario_id}/{tipo}",
         )
         if resultado is None:
             raise ValidationException(message="No se pudo subir el archivo")
 
         conductor = ConductorService.conductor_de_usuario(db, usuario_id)
+
         if tipo == "foto":
             conductor.foto_url = resultado.url
-        elif tipo == "dni":
-            conductor.dni_foto_url = resultado.url
-        elif tipo == "licencia":
-            conductor.licencia_foto_url = resultado.url
-        elif tipo == "antecedentes":
-            conductor.antecedentes_foto_url = resultado.url
-            conductor.antecedentes_valido = None  # pendiente de revision del admin
-        elif tipo == "moto":
-            vehiculo = conductor.vehiculo
-            if vehiculo is None:
-                vehiculo = Vehiculo(conductor_id=conductor.id)
-                db.add(vehiculo)
-            vehiculo.foto_url = resultado.url
+            db.commit()
+            db.refresh(conductor)
+            conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
+            return conductor
 
+        # Guarda el documento en la tabla (upsert por tipo+cara)
+        doc = (
+            db.query(DocumentoConductor)
+            .filter(
+                DocumentoConductor.conductor_id == conductor.id,
+                DocumentoConductor.tipo == tipo,
+                DocumentoConductor.cara == cara,
+            )
+            .first()
+        )
+        if doc is None:
+            doc = DocumentoConductor(conductor_id=conductor.id, tipo=tipo, cara=cara)
+            db.add(doc)
+        doc.url = resultado.url
+
+        # Al subir documentos, el conductor queda pendiente de validacion del admin.
+        conductor.aprobado = False
+        conductor.antecedentes_valido = None
         db.commit()
         db.refresh(conductor)
         conductor.saldo_carreras = saldo_service.saldo_actual(db, conductor.id)
         return conductor
+
+    @staticmethod
+    def documentos_de_conductor(db: Session, conductor_id: int) -> list[dict]:
+        """Devuelve todos los documentos subidos del conductor (para el admin)."""
+        docs = (
+            db.query(DocumentoConductor)
+            .filter(DocumentoConductor.conductor_id == conductor_id)
+            .all()
+        )
+        return [
+            {"id": d.id, "tipo": d.tipo, "cara": d.cara, "url": d.url}
+            for d in docs
+        ]
 
     @staticmethod
     def actualizar_perfil(db: Session, usuario_id: int, datos: ConductorIn) -> Conductor:

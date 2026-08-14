@@ -22,13 +22,15 @@ router = APIRouter(prefix="/conductores", tags=["🛵 Conductores"])
 @router.post("/documentos", response_model=ConductorOut)
 async def subir_documento(
     tipo: str,
+    cara: str | None = None,
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    """Sube un documento del conductor a ImageKit. tipo: foto | dni | licencia |
-    antecedentes | moto. El admin revisa y aprueba (aprobado)."""
-    return await conductor_service.subir_documento(db, usuario.usuario_id, tipo, archivo)
+    """Sube un documento del conductor a ImageKit. tipo: foto | dni | brevete |
+    soat | moto. cara: frente | dorso (solo dni y brevete). El admin revisa
+    todos los documentos y recien ahi aprueba al conductor."""
+    return await conductor_service.subir_documento(db, usuario.usuario_id, tipo, cara, archivo)
 
 
 @router.get("/perfil", response_model=ConductorOut)

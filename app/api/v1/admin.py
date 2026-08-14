@@ -68,6 +68,19 @@ async def aprobar_conductor(
     return admin_service.aprobar_conductor(db, conductor_id, aprobado)
 
 
+@router.get("/conductores/{conductor_id}/documentos")
+async def documentos_conductor(
+    conductor_id: int,
+    db: Session = Depends(get_db),
+    _usuario: UsuarioActual = Depends(requiere_tipo("administrador")),
+):
+    """Todos los documentos subidos del conductor (DNI, brevete, SOAT, moto)
+    para que el admin los revise antes de aprobarlo."""
+    from app.services.conductor_service import conductor_service
+
+    return conductor_service.documentos_de_conductor(db, conductor_id)
+
+
 @router.get("/viajes", response_model=list[ViajeOut])
 async def listar_viajes(
     estado: str | None = None,

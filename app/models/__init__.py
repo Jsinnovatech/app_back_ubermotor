@@ -1,3 +1,4 @@
+from app.models.documento_conductor import DocumentoConductor, TIPOS_DOCUMENTO, CARAS_DOCUMENTO
 from app.models.administrador import Administrador, NIVELES_ADMIN
 from app.models.alerta_sos import AlertaSOS, ESTADOS_SOS
 from app.models.calificacion import Calificacion
@@ -13,6 +14,9 @@ from app.models.viaje import Viaje, ESTADOS_VIAJE, CANCELADO_POR
 __all__ = [
     "Administrador",
     "NIVELES_ADMIN",
+    "DocumentoConductor",
+    "TIPOS_DOCUMENTO",
+    "CARAS_DOCUMENTO",
     "AlertaSOS",
     "ESTADOS_SOS",
     "Calificacion",

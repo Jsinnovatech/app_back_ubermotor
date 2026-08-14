@@ -133,6 +133,13 @@ class ViajeService:
         if viaje.estado != "solicitado":
             raise ValidationException(message="Este viaje ya no esta disponible")
 
+        # El conductor debe estar aprobado por el admin para operar.
+        conductor = db.query(Conductor).filter(Conductor.id == conductor_id).first()
+        if not conductor or not conductor.aprobado:
+            raise ValidationException(
+                message="Tu cuenta esta en validacion. El administrador debe aprobarla para aceptar carreras"
+            )
+
         tiene_activa = (
             db.query(Viaje)
             .filter(
