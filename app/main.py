@@ -14,6 +14,7 @@ from app.api.v1.realtime import router as realtime_router
 from app.api.v1.sos import router as sos_router
 from app.api.v1.autoridades import router as autoridades_router
 from app.api.v1.calificaciones import router as calificaciones_router
+from app.api.v1.geocoding import router as geocoding_router
 
 app = FastAPI(title="HablaVas API", version="0.1.0")
 
@@ -37,6 +38,7 @@ ROUTERS = [
     (sos_router, "/api/v1", None),
     (autoridades_router, "/api/v1", None),
     (calificaciones_router, "/api/v1", None),
+    (geocoding_router, "/api/v1", None),
 ]
 
 for router, prefix, tags in ROUTERS:

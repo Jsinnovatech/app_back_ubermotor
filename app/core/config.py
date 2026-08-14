@@ -40,5 +40,9 @@ class Settings:
     EMAIL_FROM_ADDRESS: str = config("EMAIL_FROM_ADDRESS", default="sistemas@jsinnovatech.com")
     EMAIL_FROM_NAME: str = config("EMAIL_FROM_NAME", default="UberMotor")
 
+    # Geoapify (geocodificacion: autocompletado de direcciones + reverse).
+    # La key vive en el BACKEND para no exponerla en el front.
+    GEOAPIFY_KEY: str = config("GEOAPIFY_KEY", default="")
+
 
 settings = Settings()
