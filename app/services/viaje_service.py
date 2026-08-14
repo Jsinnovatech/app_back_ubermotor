@@ -87,6 +87,21 @@ class ViajeService:
 
     @staticmethod
     def solicitar(db: Session, cliente_id: int, datos) -> Viaje:
+        # Regla: un cliente solo puede tener UNA carrera activa a la vez
+        # (solicitado/asignado/llegado/en_curso). Evita pedir de nuevo.
+        tiene_activa = (
+            db.query(Viaje)
+            .filter(
+                Viaje.cliente_id == cliente_id,
+                Viaje.estado.in_(("solicitado", "asignado", "llegado", "en_curso")),
+            )
+            .first()
+        )
+        if tiene_activa:
+            raise ValidationException(
+                message="Ya tienes una carrera activa. Espera a que termine o cancela la actual"
+            )
+
         viaje = Viaje(
             cliente_id=cliente_id,
             origen_lat=datos.origen_lat,
