@@ -7,6 +7,7 @@ from app.models.cliente import Cliente
 from app.models.viaje import Viaje
 from app.schemas.viaje import ViajeConRiderOut, ViajeOut
 from app.services.conductor_service import conductor_service
+from app.services.routing_service import routing_service
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/viajes", tags=["🛺 Viajes"])
@@ -38,6 +39,27 @@ async def detalle_viaje(
     """Estado actual de un viaje (lo usa el cliente en el seguimiento y el
     conductor para refrescar la carrera en curso)."""
     return viaje_service.detalle(db, viaje_id)
+
+
+@router.get("/{viaje_id}/ruta")
+async def ruta_viaje(
+    viaje_id: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
+):
+    """Ruta real por calles (OSRM) entre el origen y el destino del viaje.
+    Devuelve la polilinea de puntos {lat, lng} para dibujarla en el mapa."""
+    viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
+    if not viaje:
+        from app.core.exceptions import NotFoundException
+
+        raise NotFoundException(message="Viaje no encontrado")
+
+    puntos = await routing_service.ruta(
+        viaje.origen_lat, viaje.origen_lng,
+        viaje.destino_lat, viaje.destino_lng,
+    )
+    return {"viaje_id": viaje_id, "puntos": puntos or []}
 
 
 @router.post("/{viaje_id}/aceptar", response_model=ViajeOut)
