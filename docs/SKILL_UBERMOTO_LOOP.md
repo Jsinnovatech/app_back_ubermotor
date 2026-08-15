@@ -56,8 +56,11 @@ Autorización: `Authorization: Bearer $GITHUB_JSINNOVATECH_TOKEN`.
 ### Paso 1 — LEER Y REPRODUCIR (tarjeta ya está en Todo)
 - Leer el reporte completo. No inventar el problema: si falta detalle, se marca
   y se pide, no se adivina.
-- Identificar **flujo** (cliente / conductor / admin / autoridad / ranking / backend),
-  **opción** (si aplica), **sección** y **pantalla** exacta, y si afecta **front o back**.
+- Identificar en ORDEN (es el método de trabajo del CEO):
+  1. **¿Back o Front?** (¿qué repo se toca?)
+  2. **Flujo** (cliente / conductor / admin / autoridad / ranking / backend)
+  3. **Pantalla** exacta
+  4. **Sección** dentro de la pantalla (ej. "Motos disponibles")
 - Reproducir el comportamiento si es posible (código, lógica de estado, API).
 
 ### Paso 2 — DIAGNOSTICAR (causa raíz)
