@@ -19,13 +19,45 @@ reporta.
 - Jerarquía: el CEO (Alan) deja la incidencia; el bot (Medium) la atiende de noche
   sola; el Senior revisa el diff al día siguiente y arma el PR.
 
+## El tablero (corazón del flujo)
+
+La incidencia es una **tarjeta** en el tablero de GitHub Projects y se mueve
+según su etapa. Cada paso de abajo mueve la tarjeta al estado correcto.
+
+**Tablero UberMotor** (GitHub Projects v2)
+- Project ID: `PVT_kwHODbW81s4BgIrX`
+- Campo Status ID: `PVTSSF_lAHODbW81s4BgIrXzhaWihU`
+- Opciones: `Todo`=`f75ad846`, `In Progress`=`47fc9ee4`, `Done`=`98236657`
+
+**Ciclo de vida de la tarjeta**
+```
+Incidencia llega  →  Todo        (detallada: flujo, opción, sección, pantalla, front/back)
+Se inicia         →  In Progress (se analiza y diagnostica la causa raíz)
+Finalizada        →  Done        (fix verificado, rama pusheada, issue comentado)
+```
+
+Para mover la tarjeta (mutation GraphQL de GitHub):
+```graphql
+mutation {
+  updateProjectV2ItemFieldValue(
+    input: {
+      projectId: "PVT_kwHODbW81s4BgIrX"
+      itemId: "<ITEM_ID>"
+      fieldId: "PVTSSF_lAHODbW81s4BgIrXzhaWihU"
+      value: { singleSelectOptionId: "<f75ad846|47fc9ee4|98236657>" }
+    }
+  ) { projectV2Item { id } }
+}
+```
+Autorización: `Authorization: Bearer $GITHUB_JSINNOVATECH_TOKEN`.
+
 ## Flujo de atención de una incidencia
 
-### Paso 1 — LEER Y REPRODUCIR
+### Paso 1 — LEER Y REPRODUCIR (tarjeta ya está en Todo)
 - Leer el reporte completo. No inventar el problema: si falta detalle, se marca
   y se pide, no se adivina.
-- Identificar **flujo** (cliente / conductor / admin / autoridad / ranking / backend)
-  y **pantalla** exacta.
+- Identificar **flujo** (cliente / conductor / admin / autoridad / ranking / backend),
+  **opción** (si aplica), **sección** y **pantalla** exacta, y si afecta **front o back**.
 - Reproducir el comportamiento si es posible (código, lógica de estado, API).
 
 ### Paso 2 — DIAGNOSTICAR (causa raíz)
@@ -65,8 +97,9 @@ front, back o ambos
 ```
 Sin `Causa raíz`, `Esperado` y `Criterio de éxito` la tarea NO es válida.
 
-### Paso 4 — PONER EN CURSO
-- Comentar `En curso` en el issue (mover a in_progress si el tablero lo permite).
+### Paso 4 — PONER EN CURSO (mover la tarjeta a In Progress)
+- Mover la tarjeta del tablero a **In Progress** (`singleSelectOptionId: "47fc9ee4"`).
+- Comentar `En curso` en el issue (si tiene issue asociado).
 - Crear rama propia: `fix/ubermoto-<flujo>-<descripcion-corta>`.
 - **NUNCA tocar main ni pushear directo a main.**
 
@@ -77,10 +110,17 @@ Sin `Causa raíz`, `Esperado` y `Criterio de éxito` la tarea NO es válida.
   - Back: `.venv/bin/python -m compileall app` e importar los módulos tocados.
 - Commit convencional: `fix(flujo): descripcion` o `feat(flujo): descripcion`.
 
-### Paso 6 — PUSHEAR Y REPORTAR
+### Paso 6 — FINALIZAR (mover la tarjeta a Done y reportar)
 - Push de la rama.
 - Comentar el issue: causa raíz, archivos tocados, verificación corrida, rama.
+- Mover la tarjeta a **Done** (`singleSelectOptionId: "98236657"`).
 - No crear el PR (el Senior lo hace tras revisar el diff).
+
+### Paso 7 — APRENDER (loop que no para)
+- Registrar la lección de la incidencia atendida en la sección
+  "Incidencias típicas ya conocidas" de este skill (y en los docs del proyecto).
+- Así el skill mejora con cada incidente y el próximo se atiende más rápido.
+- Si quedan incidencias en **Todo**, volver al Paso 1 (no parar hasta agotar el tablero).
 
 ## Mapa de flujos y secciones
 
