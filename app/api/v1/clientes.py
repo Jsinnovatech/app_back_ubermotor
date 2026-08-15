@@ -8,6 +8,7 @@ from app.models.cliente import Cliente
 from app.schemas.auth import MensajeResponse
 from app.schemas.cliente import ClienteOut
 from app.schemas.viaje import SolicitarViajeIn, ViajeOut
+from app.services.push_service import push_service
 from app.services.realtime_service import realtime_manager
 from app.services.storage.imagekit_service import imagekit_service
 from app.services.viaje_service import conductores_disponibles_cerca, viaje_service
@@ -49,7 +50,8 @@ async def solicitar_viaje(
     usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
 ):
     """Pide un viaje. Tarifa minima 3 soles, pago directo al conductor (Yape/efectivo).
-    Apenas se crea, se EMPUJA a los conductores conectados por WebSocket (<1s)."""
+    Apenas se crea, se EMPUJA a los conductores conectados por WebSocket (<1s)
+    y se les manda un PUSH OneSignal para que suene aunque la app este cerrada."""
     cliente = _cliente_de_usuario(db, usuario.usuario_id)
     viaje = viaje_service.solicitar(db, cliente.id, datos)
 
@@ -58,6 +60,12 @@ async def solicitar_viaje(
         await realtime_manager.notificar_viaje(payload)
     except Exception:
         # Si falla el push, el polling del front sigue siendo el fallback.
+        pass
+
+    # Push OneSignal: despierta el telefono del conductor (app cerrada/fondo).
+    try:
+        push_service.notificar_nueva_carrera(db, datos.origen_lat, datos.origen_lng, payload)
+    except Exception:
         pass
 
     return viaje

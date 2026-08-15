@@ -44,5 +44,11 @@ class Settings:
     # La key vive en el BACKEND para no exponerla en el front.
     GEOAPIFY_KEY: str = config("GEOAPIFY_KEY", default="")
 
+    # OneSignal (notificaciones push: despiertan el telefono aunque la app este
+    # cerrada o en segundo plano). El app_id va tambien en el front (dart-define),
+    # la REST API Key SOLO vive aca en el backend.
+    ONESIGNAL_APP_ID: str = config("ONESIGNAL_APP_ID", default="")
+    ONESIGNAL_REST_API_KEY: str = config("ONESIGNAL_REST_API_KEY", default="")
+
 
 settings = Settings()

@@ -7,6 +7,7 @@ from app.models.cliente import Cliente
 from app.models.viaje import Viaje
 from app.schemas.viaje import ViajeConRiderOut, ViajeOut
 from app.services.conductor_service import conductor_service
+from app.services.push_service import push_service
 from app.services.routing_service import routing_service
 from app.services.viaje_service import viaje_service
 
@@ -70,7 +71,17 @@ async def aceptar(
 ):
     """El conductor acepta: consume 1 carrera de su saldo (falla si saldo 0)."""
     conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
-    return viaje_service.aceptar(db, viaje_id, conductor.id)
+    viaje = viaje_service.aceptar(db, viaje_id, conductor.id)
+
+    # Push OneSignal: el cliente se entera al instante que su conductor va en
+    # camino, aunque tenga la app cerrada. El detalle incluye nombre/moto/placa.
+    try:
+        detalle = viaje_service.viaje_activo_de_cliente(db, viaje.cliente_id)
+        if detalle:
+            push_service.notificar_conductor_en_camino(db, detalle, viaje.cliente_id)
+    except Exception:
+        pass
+    return viaje
 
 
 @router.post("/{viaje_id}/rechazar", response_model=ViajeOut)
@@ -102,7 +113,13 @@ async def llegar(
     """El conductor llego al punto de recogida: el viaje pasa a 'llegado' y el
     cliente ve 'Tu conductor esta esperando'."""
     conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
-    return viaje_service.llegar(db, viaje_id, conductor.id)
+    viaje = viaje_service.llegar(db, viaje_id, conductor.id)
+
+    try:
+        push_service.notificar_conductor_llego(db, viaje_service.detalle(db, viaje.id), viaje.cliente_id)
+    except Exception:
+        pass
+    return viaje
 
 
 @router.post("/{viaje_id}/completar", response_model=ViajeOut)
@@ -111,7 +128,13 @@ async def completar(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    return viaje_service.completar(db, viaje_id)
+    viaje = viaje_service.completar(db, viaje_id)
+
+    try:
+        push_service.notificar_viaje_completado(db, viaje_service.detalle(db, viaje.id), viaje.cliente_id)
+    except Exception:
+        pass
+    return viaje
 
 
 @router.post("/{viaje_id}/cancelar", response_model=ViajeOut)
@@ -128,4 +151,11 @@ async def cancelar(
         cliente = _cliente_de_usuario(db, usuario.usuario_id)
     else:
         conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
-    return viaje_service.cancelar(db, viaje_id, quien="cliente" if cliente else "conductor")
+    viaje = viaje_service.cancelar(db, viaje_id, quien="cliente" if cliente else "conductor")
+
+    # Avisa por push al conductor de la carrera cancelada.
+    try:
+        push_service.notificar_viaje_cancelado(db, viaje_service.detalle(db, viaje.id), viaje.conductor_id)
+    except Exception:
+        pass
+    return viaje
