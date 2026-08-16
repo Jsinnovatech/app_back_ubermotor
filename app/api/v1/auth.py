@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.security import get_usuario_actual, UsuarioActual
 from app.database import get_db
 from app.schemas.auth import (
+    GoogleLoginRequest,
     LoginRequest,
     LoginResponse,
     MensajeResponse,
@@ -26,6 +27,13 @@ async def registrar(request: RegistroRequest, db: Session = Depends(get_db)):
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Login por email+password para los tres perfiles."""
     return auth_service.login(db, request.email, request.password)
+
+
+@router.post("/google", response_model=LoginResponse)
+async def login_google(request: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """Login/registro con Google. Si el email ya existe hace login directo;
+    si es cuenta nueva, la crea (requiere tipo_usuario: conductor o cliente)."""
+    return await auth_service.login_google(db, request.id_token, request.tipo_usuario)
 
 
 @router.post("/solicitar-reset", response_model=MensajeResponse)

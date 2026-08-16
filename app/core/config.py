@@ -50,5 +50,10 @@ class Settings:
     ONESIGNAL_APP_ID: str = config("ONESIGNAL_APP_ID", default="")
     ONESIGNAL_REST_API_KEY: str = config("ONESIGNAL_REST_API_KEY", default="")
 
+    # Google Sign-In: Web Client ID del proyecto (Google Cloud Console /
+    # Firebase). Se usa para validar el campo "aud" del id_token que manda
+    # el front, y confirmar que el token es realmente para esta app.
+    GOOGLE_CLIENT_ID: str = config("GOOGLE_CLIENT_ID", default="")
+
 
 settings = Settings()

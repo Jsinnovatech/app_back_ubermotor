@@ -17,6 +17,15 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    """id_token que entrega el SDK de Google Sign-In en el front. tipo_usuario
+    solo hace falta la primera vez (cuenta nueva); si el email ya existe se
+    ignora y se usa el tipo_usuario ya registrado."""
+
+    id_token: str
+    tipo_usuario: str | None = None  # conductor | cliente (autoservicio; admin/serenazgo/policia no)
+
+
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

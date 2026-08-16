@@ -1,8 +1,10 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
+import httpx
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.exceptions import AuthenticationException, ValidationException
 from app.core.security import SecurityService
 from app.models.administrador import Administrador
@@ -13,6 +15,7 @@ from app.schemas.auth import RegistroRequest
 from app.services.email_service import email_service
 
 MINUTOS_VALIDEZ_RESET = 15
+_GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 
 class AuthService:
@@ -61,6 +64,64 @@ class AuthService:
         usuario = db.query(Usuario).filter(Usuario.email == email, Usuario.activo.is_(True)).first()
         if not usuario or not SecurityService.verify_password(password, usuario.password_hash):
             raise AuthenticationException(message="Email o contraseña invalidos")
+
+        nombre = AuthService._nombre_de_perfil(db, usuario)
+        token = SecurityService.create_access_token(usuario.id, usuario.tipo_usuario)
+        return {
+            "access_token": token,
+            "usuario_id": usuario.id,
+            "nombre": nombre,
+            "tipo_usuario": usuario.tipo_usuario,
+        }
+
+    @staticmethod
+    async def login_google(db: Session, id_token: str, tipo_usuario: str | None) -> dict:
+        """Login/registro con Google. Verifica el id_token contra el propio
+        Google (sin libreria extra: mismo patron httpx que push_service),
+        confirma que es para esta app (aud == GOOGLE_CLIENT_ID) y que el
+        email esta verificado. Si el email ya existe, es login directo
+        (ignora tipo_usuario); si no existe, lo registra con el tipo_usuario
+        que mando el front (obligatorio en ese caso, solo conductor/cliente:
+        admin/serenazgo/policia no se autorregistran)."""
+        try:
+            async with httpx.AsyncClient(timeout=10) as cliente_http:
+                resp = await cliente_http.get(_GOOGLE_TOKENINFO_URL, params={"id_token": id_token})
+        except Exception:
+            raise AuthenticationException(message="No se pudo validar el token de Google")
+
+        if resp.status_code != 200:
+            raise AuthenticationException(message="Token de Google invalido o expirado")
+
+        info = resp.json()
+        if info.get("aud") != settings.GOOGLE_CLIENT_ID:
+            raise AuthenticationException(message="Token de Google no corresponde a esta app")
+        if info.get("email_verified") not in ("true", True):
+            raise AuthenticationException(message="El correo de Google no esta verificado")
+
+        email = info["email"]
+        usuario = db.query(Usuario).filter(Usuario.email == email, Usuario.activo.is_(True)).first()
+
+        if usuario is None:
+            if tipo_usuario not in ("conductor", "cliente"):
+                raise ValidationException(message="Cuenta nueva: falta indicar tipo_usuario (conductor o cliente)")
+            nombre = info.get("name") or email.split("@")[0]
+            # password_hash sigue siendo NOT NULL en la tabla: se guarda un
+            # hash de un secreto aleatorio que nadie conoce, la cuenta solo
+            # se puede usar via Google (no rompe el login por password).
+            usuario = Usuario(
+                email=email,
+                password_hash=SecurityService.hash_password(secrets.token_urlsafe(32)),
+                tipo_usuario=tipo_usuario,
+                verificado=True,
+            )
+            db.add(usuario)
+            db.flush()
+
+            if tipo_usuario == "conductor":
+                db.add(Conductor(usuario_id=usuario.id, nombre=nombre))
+            else:
+                db.add(Cliente(usuario_id=usuario.id, nombre=nombre))
+            db.commit()
 
         nombre = AuthService._nombre_de_perfil(db, usuario)
         token = SecurityService.create_access_token(usuario.id, usuario.tipo_usuario)
