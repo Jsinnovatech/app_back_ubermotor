@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
+from app.models.cliente import Cliente
 from app.schemas.conductor import (
     ConductorIn,
     ConductorOut,
@@ -17,6 +18,24 @@ from app.services.saldo_service import saldo_service
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/conductores", tags=["🛵 Conductores"])
+
+
+@router.post("/perfil-pasajero")
+async def activar_modo_pasajero(
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """El conductor activa el modo pasajero (como InDrive): se crea su perfil de
+    cliente si no existe. Asi la misma cuenta puede pedir carreras como pasajero
+    sin perder su perfil de conductor."""
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
+    cliente = db.query(Cliente).filter(Cliente.usuario_id == usuario.usuario_id).first()
+    if cliente is None:
+        cliente = Cliente(usuario_id=usuario.usuario_id, nombre=conductor.nombre)
+        db.add(cliente)
+        db.commit()
+        db.refresh(cliente)
+    return {"id": cliente.id, "nombre": cliente.nombre, "pasajero_activo": True}
 
 
 @router.post("/documentos", response_model=ConductorOut)

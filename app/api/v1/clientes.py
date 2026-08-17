@@ -23,7 +23,7 @@ def _cliente_de_usuario(db: Session, usuario_id: int) -> Cliente:
 @router.get("/perfil", response_model=ClienteOut)
 async def mi_perfil(
     db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
 ):
     """Perfil del cliente (nombre, foto, viajes, rating) para la pestana Cuenta."""
     cliente = _cliente_de_usuario(db, usuario.usuario_id)
@@ -36,7 +36,7 @@ async def conductores_disponibles(
     lng: float = Query(...),
     radio_km: float = Query(default=5.0),
     db: Session = Depends(get_db),
-    _usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+    _usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
 ):
     """Motos disponibles cerca del cliente (conductor aprobado + disponible +
     con saldo), con reputacion (rating, viajes) para decidir."""
@@ -47,7 +47,7 @@ async def conductores_disponibles(
 async def solicitar_viaje(
     datos: SolicitarViajeIn,
     db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
 ):
     """Pide un viaje. Tarifa minima 3 soles, pago directo al conductor (Yape/efectivo).
     Apenas se crea, se EMPUJA a los conductores conectados por WebSocket (<1s)
@@ -74,7 +74,7 @@ async def solicitar_viaje(
 @router.get("/viajes", response_model=list[ViajeOut])
 async def historial(
     db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
 ):
     cliente = _cliente_de_usuario(db, usuario.usuario_id)
     return viaje_service.historial_cliente(db, cliente.id)
@@ -83,7 +83,7 @@ async def historial(
 @router.get("/viaje-activo")
 async def viaje_activo_cliente(
     db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
 ):
     """El viaje en curso del cliente (asignado/llegado/en_curso) con los datos
     del conductor (nombre, moto, rating, foto) para la pantalla de seguimiento."""
@@ -95,7 +95,7 @@ async def viaje_activo_cliente(
 async def subir_foto(
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
 ):
     """El cliente sube su foto de perfil (la policia la ve en la Central SOS)."""
     if not imagekit_service.disponible:
