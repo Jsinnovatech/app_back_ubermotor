@@ -118,12 +118,14 @@ class AuthService:
             db.flush()
 
             if tipo_usuario == "conductor":
-                db.add(Conductor(usuario_id=usuario.id, nombre=nombre))
+                db.add(Conductor(usuario_id=usuario.id, nombre=nombre, foto_url=info.get("picture")))
             else:
-                db.add(Cliente(usuario_id=usuario.id, nombre=nombre))
+                db.add(Cliente(usuario_id=usuario.id, nombre=nombre, foto_url=info.get("picture")))
             db.commit()
 
         nombre = AuthService._nombre_de_perfil(db, usuario)
+        # Si el usuario ya existia sin foto, se la tomamos de Google.
+        AuthService._actualizar_foto_si_falta(db, usuario, info.get("picture"))
         token = SecurityService.create_access_token(usuario.id, usuario.tipo_usuario)
         return {
             "access_token": token,
@@ -131,6 +133,20 @@ class AuthService:
             "nombre": nombre,
             "tipo_usuario": usuario.tipo_usuario,
         }
+
+    @staticmethod
+    def _actualizar_foto_si_falta(db: Session, usuario: Usuario, picture: str | None) -> None:
+        if not picture:
+            return
+        if usuario.tipo_usuario == "conductor":
+            perfil = db.query(Conductor).filter(Conductor.usuario_id == usuario.id).first()
+        elif usuario.tipo_usuario == "cliente":
+            perfil = db.query(Cliente).filter(Cliente.usuario_id == usuario.id).first()
+        else:
+            return
+        if perfil is not None and not perfil.foto_url:
+            perfil.foto_url = picture
+            db.commit()
 
     @staticmethod
     def _nombre_de_perfil(db: Session, usuario: Usuario) -> str:
