@@ -140,13 +140,19 @@ class AuthService:
             return
         if usuario.tipo_usuario == "conductor":
             perfil = db.query(Conductor).filter(Conductor.usuario_id == usuario.id).first()
+            if perfil is not None and not perfil.foto_url:
+                perfil.foto_url = picture
+                db.commit()
+            # Si el conductor tambien tiene perfil de pasajero, se la sincronizamos.
+            pasajero = db.query(Cliente).filter(Cliente.usuario_id == usuario.id).first()
+            if pasajero is not None and not pasajero.foto_url:
+                pasajero.foto_url = picture
+                db.commit()
         elif usuario.tipo_usuario == "cliente":
             perfil = db.query(Cliente).filter(Cliente.usuario_id == usuario.id).first()
-        else:
-            return
-        if perfil is not None and not perfil.foto_url:
-            perfil.foto_url = picture
-            db.commit()
+            if perfil is not None and not perfil.foto_url:
+                perfil.foto_url = picture
+                db.commit()
 
     @staticmethod
     def _nombre_de_perfil(db: Session, usuario: Usuario) -> str:

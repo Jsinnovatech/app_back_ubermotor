@@ -31,10 +31,15 @@ async def activar_modo_pasajero(
     conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     cliente = db.query(Cliente).filter(Cliente.usuario_id == usuario.usuario_id).first()
     if cliente is None:
-        cliente = Cliente(usuario_id=usuario.usuario_id, nombre=conductor.nombre)
+        cliente = Cliente(usuario_id=usuario.usuario_id, nombre=conductor.nombre, foto_url=conductor.foto_url)
         db.add(cliente)
         db.commit()
         db.refresh(cliente)
+    else:
+        # Si el cliente no tiene foto, se la pasamos del conductor.
+        if not cliente.foto_url and conductor.foto_url:
+            cliente.foto_url = conductor.foto_url
+            db.commit()
     return {"id": cliente.id, "nombre": cliente.nombre, "pasajero_activo": True}
 
 
@@ -50,6 +55,17 @@ async def subir_documento(
     soat | moto. cara: frente | dorso (solo dni y brevete). El admin revisa
     todos los documentos y recien ahi aprueba al conductor."""
     return await conductor_service.subir_documento(db, usuario.usuario_id, tipo, cara, archivo)
+
+
+@router.get("/documentos")
+async def mis_documentos(
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """Documentos del conductor subidos (tipo, cara, url). El perfil usa esto
+    para saber si le falta algo, no los campos viejos dni_foto_url/etc."""
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
+    return conductor_service.documentos_de_conductor(db, conductor.id)
 
 
 @router.get("/perfil", response_model=ConductorOut)
