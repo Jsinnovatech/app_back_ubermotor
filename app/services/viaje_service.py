@@ -7,6 +7,7 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.models.cliente import Cliente
 from app.models.conductor import Conductor
 from app.models.viaje import Viaje
+from app.models.viaje_oferta import ViajeOferta
 from app.models.vehiculo import Vehiculo
 from app.services.saldo_service import saldo_service
 
@@ -110,10 +111,10 @@ class ViajeService:
             destino_lng=datos.destino_lng,
             origen_direccion=datos.origen_direccion,
             destino_direccion=datos.destino_direccion,
-            tarifa=datos.tarifa,
+            tarifa=datos.tarifa if datos.tarifa is not None else settings.TARIFA_MINIMA_CARRERA,
             metodo_pago_cliente=datos.metodo_pago_cliente,
         )
-        # Tarifa minima validada en el schema (ge=3.0) y aca de nuevo por defensa.
+        # Tarifa de piso validada en el schema (ge=3.0) y aca de nuevo por defensa.
         if viaje.tarifa < settings.TARIFA_MINIMA_CARRERA:
             raise ValidationException(
                 message=f"La tarifa minima por carrera es de {settings.TARIFA_MINIMA_CARRERA:.0f} soles"
@@ -250,6 +251,10 @@ class ViajeService:
 
         viaje.estado = "cancelado"
         viaje.cancelado_por = quien
+        # Cierra todas las ofertas activas de este viaje (quedan 'vencidas').
+        db.query(ViajeOferta).filter(
+            ViajeOferta.viaje_id == viaje_id, ViajeOferta.estado == "activa"
+        ).update({"estado": "vencida"})
         db.commit()
         db.refresh(viaje)
         return viaje

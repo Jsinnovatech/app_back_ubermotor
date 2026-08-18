@@ -98,8 +98,26 @@ class PushService:
         self.lanzar(self.enviar(
             ids,
             "Nueva carrera disponible",
-            f"Cliente en {viaje.get('origen_direccion') or 'origen'} · S/ {viaje.get('tarifa', 0):.2f}",
+            f"Cliente en {viaje.get('origen_direccion') or 'origen'} · Precio base S/ {viaje.get('tarifa', 0):.2f}",
             {"tipo": "viaje_nuevo", "viaje_id": viaje.get("id")},
+        ))
+
+    def notificar_oferta_nueva(self, db: Session, viaje: dict) -> None:
+        """Oferta registrada -> push al cliente 'tienes nuevas propuestas'. La
+        app abierta lo resuelve el WebSocket (sin push duplicado si no hace
+        falta, pero OneSignal es idempotente ante el mismo external id)."""
+        if not self._habilitado:
+            return
+        cliente = db.query(Cliente).filter(Cliente.id == viaje.get("cliente_id")).first()
+        if cliente is None:
+            return
+        n = viaje.get("ofertas_activas", 0)
+        cuerpo = "Tienes nuevas propuestas de conductores cerca." if n else "Un conductor ofertó por tu carrera."
+        self.lanzar(self.enviar(
+            [_ids_cliente(cliente.usuario_id)],
+            "💸 Nuevas propuestas",
+            cuerpo,
+            {"tipo": "oferta_nueva", "viaje_id": viaje.get("id")},
         ))
 
     def notificar_conductor_en_camino(self, db: Session, viaje: dict, cliente_id: int) -> None:

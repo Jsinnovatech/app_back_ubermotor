@@ -10,6 +10,7 @@ from app.models.recarga import Recarga, ESTADOS_RECARGA
 from app.models.usuario import Usuario, TIPOS_USUARIO
 from app.models.vehiculo import Vehiculo
 from app.models.viaje import Viaje, ESTADOS_VIAJE, CANCELADO_POR
+from app.models.viaje_oferta import ViajeOferta, ESTADOS_OFERTA
 
 __all__ = [
     "Administrador",
@@ -33,4 +34,6 @@ __all__ = [
     "Viaje",
     "ESTADOS_VIAJE",
     "CANCELADO_POR",
+    "ViajeOferta",
+    "ESTADOS_OFERTA",
 ]
