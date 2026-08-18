@@ -81,6 +81,19 @@ async def aceptar(
             push_service.notificar_conductor_en_camino(db, detalle, viaje.cliente_id)
     except Exception:
         pass
+
+    # WebSocket: evento en vivo al cliente conectado -> aparece la tarjeta del
+    # conductor abajo al instante (no espera el polling de 5s).
+    try:
+        cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()
+        if cliente is not None:
+            detalle = viaje_service.viaje_activo_de_cliente(db, viaje.cliente_id)
+            if detalle:
+                payload = dict(detalle)
+                payload["tipo"] = "viaje_aceptado"
+                await realtime_manager.enviar_a_cliente(cliente.usuario_id, payload)
+    except Exception:
+        pass
     return viaje
 
 
@@ -144,7 +157,9 @@ async def cancelar(
     usuario: UsuarioActual = Depends(requiere_tipo("cliente", "conductor")),
 ):
     """Cliente cancela -> la carrera se devuelve al saldo.
-    Conductor cancela -> cuenta como rechazo (regla del -1/3)."""
+    Conductor cancela sin iniciar (asignado/llegado) -> se devuelve la carrera.
+    Conductor rechaza en solicitado -> cuenta como rechazo (regla del -1/3).
+    El boton cancelar nunca esta disponible en 'en_curso'."""
     cliente = None
     conductor = None
     if usuario.tipo_usuario == "cliente":

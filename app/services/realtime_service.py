@@ -77,5 +77,18 @@ class RealtimeManager:
             self.desconectar_cliente(cliente_id)
             return False
 
+    async def enviar_a_cliente(self, usuario_id: int, datos: dict) -> bool:
+        """Empuja un evento arbitrario al cliente conectado (viaje_aceptado,
+        viaje_llegado, etc). Clave por usuario_id (igual que conectar_cliente)."""
+        ws = self._clientes.get(usuario_id)
+        if ws is None:
+            return False
+        try:
+            await ws.send_json(datos)
+            return True
+        except Exception:
+            self.desconectar_cliente(usuario_id)
+            return False
+
 
 realtime_manager = RealtimeManager()

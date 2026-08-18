@@ -232,15 +232,21 @@ class ViajeService:
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
-        if viaje.estado not in ("solicitado", "asignado", "en_curso"):
+        # El boton Cancelar nunca esta disponible en "en_curso".
+        if viaje.estado not in ("solicitado", "asignado", "llegado"):
             raise ValidationException(message="Este viaje ya esta cerrado")
 
         # Regla del saldo: si el CLIENTE cancela, la carrera se devuelve.
         if quien == "cliente" and viaje.conductor_id is not None:
             saldo_service.devolver_carrera(db, viaje.conductor_id)
         elif quien == "conductor" and viaje.conductor_id is not None:
-            # Cancelar una carrera YA aceptada cuenta como rechazo (regla del -1/3).
-            saldo_service.registrar_rechazo(db, viaje.conductor_id)
+            if viaje.estado == "solicitado":
+                # Rechazo sin haberla aceptado: cuenta para la regla del -1/3.
+                saldo_service.registrar_rechazo(db, viaje.conductor_id)
+            else:
+                # Conductor cancela estando en camino (asignado) o en el punto
+                # (llegado), sin haber iniciado el viaje: se devuelve la carrera.
+                saldo_service.devolver_carrera(db, viaje.conductor_id)
 
         viaje.estado = "cancelado"
         viaje.cancelado_por = quien
