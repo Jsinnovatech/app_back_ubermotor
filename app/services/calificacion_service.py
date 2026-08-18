@@ -38,9 +38,13 @@ class CalificacionService:
         if not (es_cliente or es_conductor):
             raise ValidationException(message="Solo el cliente o el conductor de este viaje pueden calificar")
 
-        ya = db.query(Calificacion).filter(Calificacion.viaje_id == viaje_id).first()
+        ya = (
+            db.query(Calificacion)
+            .filter(Calificacion.viaje_id == viaje_id, Calificacion.autor_id == autor_id)
+            .first()
+        )
         if ya:
-            raise ValidationException(message="Este viaje ya fue calificado")
+            raise ValidationException(message="Ya calificaste este viaje")
 
         cal = Calificacion(viaje_id=viaje_id, autor_id=autor_id, puntaje=puntaje, comentario=comentario)
         db.add(cal)

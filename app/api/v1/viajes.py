@@ -5,10 +5,12 @@ from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.viaje import Viaje
-from app.schemas.viaje import ViajeConRiderOut, ViajeOut
+from app.schemas.viaje import CrearOfertaIn, ViajeConRiderOut, ViajeOut
 from app.services.conductor_service import conductor_service
 from app.services.push_service import push_service
+from app.services.realtime_service import realtime_manager
 from app.services.routing_service import routing_service
+from app.services.viaje_oferta_service import viaje_oferta_service
 from app.services.viaje_service import viaje_service
 
 router = APIRouter(prefix="/viajes", tags=["🛺 Viajes"])
@@ -29,6 +31,88 @@ async def viajes_disponibles(
     """Viajes 'solicitado' con la info del rider (nombre + puntuacion). Si se
     pasan lat/lng, solo devuelve los viajes cuyo ORIGEN esta dentro del radio."""
     return viaje_service.disponibles_cerca(db, lat=lat, lng=lng, radio_km=radio_km)
+
+
+@router.post("/{viaje_id}/ofertas")
+async def crear_oferta(
+    viaje_id: int,
+    body: CrearOfertaIn,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """El conductor oferta su precio sobre un viaje 'solicitado' (patron
+    InDrive). NO consume saldo: se consume cuando el cliente acepta la oferta."""
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
+    oferta = viaje_oferta_service.crear(db, viaje_id, conductor.id, body.precio_ofertado)
+
+    # Notifica al cliente conectado por WebSocket que hay una propuesta nueva.
+    try:
+        viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
+        if viaje is not None:
+            cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()
+            push_service.notificar_oferta_nueva(db, {"id": viaje_id, "cliente_id": viaje.cliente_id})
+            if cliente is not None:
+                payload = {
+                    "tipo": "oferta_nueva",
+                    "viaje_id": viaje_id,
+                    "oferta_id": oferta.id,
+                    "precio_ofertado": oferta.precio_ofertado,
+                    "conductor_id": conductor.id,
+                }
+                await realtime_manager.enviar_a_cliente(cliente.usuario_id, payload)
+    except Exception:
+        pass
+    return {"id": oferta.id, "viaje_id": oferta.viaje_id, "precio_ofertado": oferta.precio_ofertado, "estado": oferta.estado}
+
+
+@router.get("/{viaje_id}/ofertas")
+async def listar_ofertas(
+    viaje_id: int,
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+):
+    """Propuestas activas del viaje para el cliente, de a 3. El frontend pide
+    con offset 0, 3, 6... (boton 'Ver mas ofertas')."""
+    return viaje_oferta_service.listar_para_cliente(db, viaje_id, offset=offset)
+
+
+@router.post("/{viaje_id}/ofertas/{oferta_id}/aceptar", response_model=ViajeOut)
+async def aceptar_oferta(
+    viaje_id: int,
+    oferta_id: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("cliente")),
+):
+    """El cliente acepta la oferta: consume el saldo del conductor (Opcion A),
+    asigna el conductor y el resto de ofertas se cierran."""
+    cliente = _cliente_de_usuario(db, usuario.usuario_id)
+    viaje = viaje_oferta_service.aceptar(db, viaje_id, oferta_id, cliente.id)
+
+    # Push + WS al conductor ganador: va en camino.
+    try:
+        detalle = viaje_service.viaje_activo_de_cliente(db, viaje.cliente_id)
+        if detalle:
+            push_service.notificar_conductor_en_camino(db, detalle, viaje.cliente_id)
+            payload = dict(detalle)
+            payload["tipo"] = "viaje_aceptado"
+            await realtime_manager.enviar_a_cliente(cliente.usuario_id, payload)
+    except Exception:
+        pass
+    return viaje
+
+
+@router.delete("/{viaje_id}/ofertas/{oferta_id}")
+async def retirar_oferta(
+    viaje_id: int,
+    oferta_id: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
+):
+    """El conductor retira su oferta antes de que venza."""
+    conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
+    oferta = viaje_oferta_service.retirar(db, viaje_id, oferta_id, conductor.id)
+    return {"id": oferta.id, "estado": oferta.estado}
 
 
 @router.get("/{viaje_id}", response_model=ViajeConRiderOut)
