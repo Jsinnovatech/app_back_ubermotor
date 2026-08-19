@@ -214,9 +214,21 @@ async def llegar(
     cliente ve 'Tu conductor esta esperando'."""
     conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
     viaje = viaje_service.llegar(db, viaje_id, conductor.id)
+    detalle = viaje_service.detalle(db, viaje.id)
 
     try:
-        push_service.notificar_conductor_llego(db, viaje_service.detalle(db, viaje.id), viaje.cliente_id)
+        push_service.notificar_conductor_llego(db, detalle, viaje.cliente_id)
+    except Exception:
+        pass
+
+    # WebSocket: aviso instantaneo al cliente conectado (no espera el
+    # polling de 5s) de que su conductor ya llego al punto de recojo.
+    try:
+        cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()
+        if cliente is not None:
+            payload = dict(detalle)
+            payload["tipo"] = "viaje_llegado"
+            await realtime_manager.enviar_a_cliente(cliente.usuario_id, payload)
     except Exception:
         pass
     return viaje
@@ -229,9 +241,21 @@ async def completar(
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
     viaje = viaje_service.completar(db, viaje_id)
+    detalle = viaje_service.detalle(db, viaje.id)
 
     try:
-        push_service.notificar_viaje_completado(db, viaje_service.detalle(db, viaje.id), viaje.cliente_id)
+        push_service.notificar_viaje_completado(db, detalle, viaje.cliente_id)
+    except Exception:
+        pass
+
+    # WebSocket: aviso instantaneo al cliente conectado de que la carrera
+    # termino (dispara el modal de calificacion sin esperar el polling).
+    try:
+        cliente = db.query(Cliente).filter(Cliente.id == viaje.cliente_id).first()
+        if cliente is not None:
+            payload = dict(detalle)
+            payload["tipo"] = "viaje_completado"
+            await realtime_manager.enviar_a_cliente(cliente.usuario_id, payload)
     except Exception:
         pass
     return viaje
