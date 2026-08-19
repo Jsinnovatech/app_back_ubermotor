@@ -34,6 +34,19 @@ class RealtimeManager:
         if self._conexiones.pop(conductor_id, None) is not None:
             logger.info(f"Conductor {conductor_id} desconectado del WS ({len(self._conexiones)} activos)")
 
+    async def enviar_a_conductor(self, conductor_usuario_id: int, datos: dict) -> bool:
+        """Empuja un evento al conductor conectado (viaje_aceptado, etc).
+        Clave por usuario_id (igual que conectar_conductor)."""
+        ws = self._conexiones.get(conductor_usuario_id)
+        if ws is None:
+            return False
+        try:
+            await ws.send_json(datos)
+            return True
+        except Exception:
+            self.desconectar_conductor(conductor_usuario_id)
+            return False
+
     async def notificar_viaje(self, viaje: dict) -> int:
         """Empuja el viaje a todos los conductores conectados. Devuelve cuantos recibieron."""
         enviados = 0

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.security import requiere_tipo, UsuarioActual
 from app.database import get_db
 from app.models.cliente import Cliente
+from app.models.conductor import Conductor
 from app.models.viaje import Viaje
 from app.schemas.viaje import CrearOfertaIn, ViajeConRiderOut, ViajeOut
 from app.services.conductor_service import conductor_service
@@ -89,14 +90,16 @@ async def aceptar_oferta(
     cliente = _cliente_de_usuario(db, usuario.usuario_id)
     viaje = viaje_oferta_service.aceptar(db, viaje_id, oferta_id, cliente.id)
 
-    # Push + WS al conductor ganador: va en camino.
+    # Push + WS al conductor ganador: ya es su carrera, va en camino.
     try:
-        detalle = viaje_service.viaje_activo_de_cliente(db, viaje.cliente_id)
+        detalle = viaje_service.viaje_activo_de_conductor(db, viaje.conductor_id)
         if detalle:
             push_service.notificar_conductor_en_camino(db, detalle, viaje.cliente_id)
-            payload = dict(detalle)
-            payload["tipo"] = "viaje_aceptado"
-            await realtime_manager.enviar_a_cliente(cliente.usuario_id, payload)
+            conductor = db.query(Conductor).filter(Conductor.id == viaje.conductor_id).first()
+            if conductor is not None:
+                payload = dict(detalle)
+                payload["tipo"] = "viaje_aceptado"
+                await realtime_manager.enviar_a_conductor(conductor.usuario_id, payload)
     except Exception:
         pass
     return viaje
