@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.security import SecurityService
@@ -30,7 +32,12 @@ async def ws_conductores(websocket: WebSocket):
     await realtime_manager.conectar_conductor(conductor_id, websocket)
     try:
         while True:
-            await websocket.receive_text()
+            mensaje = await websocket.receive_text()
+            try:
+                if json.loads(mensaje).get("tipo") == "pong":
+                    realtime_manager.registrar_pong("conductor", conductor_id)
+            except ValueError:
+                pass
     except WebSocketDisconnect:
         realtime_manager.desconectar_conductor(conductor_id)
     except Exception:
@@ -60,7 +67,12 @@ async def ws_clientes(websocket: WebSocket):
     await realtime_manager.conectar_cliente(cliente_id, websocket)
     try:
         while True:
-            await websocket.receive_text()
+            mensaje = await websocket.receive_text()
+            try:
+                if json.loads(mensaje).get("tipo") == "pong":
+                    realtime_manager.registrar_pong("cliente", cliente_id)
+            except ValueError:
+                pass
     except WebSocketDisconnect:
         realtime_manager.desconectar_cliente(cliente_id)
     except Exception:
