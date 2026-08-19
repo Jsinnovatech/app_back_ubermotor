@@ -139,9 +139,20 @@ class ConductorService:
             if vehiculo is None:
                 vehiculo = Vehiculo(conductor_id=conductor.id)
                 db.add(vehiculo)
+            if v.placa:
+                placa_normalizada = v.placa.strip().upper()
+                # La placa es unica: si ya esta registrada a OTRO conductor,
+                # no se deja continuar (evita que dos cuentas usen la misma moto).
+                otra = (
+                    db.query(Vehiculo)
+                    .filter(Vehiculo.placa == placa_normalizada, Vehiculo.conductor_id != conductor.id)
+                    .first()
+                )
+                if otra is not None:
+                    raise ValidationException(message="Esta placa ya esta registrada y no te pertenece")
+                vehiculo.placa = placa_normalizada
             vehiculo.marca = v.marca or vehiculo.marca
             vehiculo.modelo = v.modelo or vehiculo.modelo
-            vehiculo.placa = v.placa or vehiculo.placa
             vehiculo.color = v.color or vehiculo.color
         db.commit()
         db.refresh(conductor)
