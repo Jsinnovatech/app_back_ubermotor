@@ -12,7 +12,7 @@ from app.models.viaje import Viaje
 from app.models.viaje_oferta import ViajeOferta
 from app.services.saldo_service import saldo_service
 
-PLAZO_OFERTA_SEGUNDOS = 30
+PLAZO_OFERTA_SEGUNDOS = 50
 POR_PAGINA = 3
 
 
