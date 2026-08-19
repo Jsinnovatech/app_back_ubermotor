@@ -8,6 +8,7 @@ from app.models.recarga import Recarga
 from app.schemas.recarga import PaqueteOut, RecargaOut, ComprarRecargaIn
 from app.schemas.viaje import ViajeOut
 from app.services.conductor_service import conductor_service
+from app.services.realtime_service import realtime_manager
 from app.services.saldo_service import saldo_service
 from app.services.viaje_service import viaje_service
 
@@ -38,7 +39,11 @@ async def confirmar_pago(
 ):
     """Confirma el pago (p.ej. verificacion manual del Yape) y acredita el saldo del dia."""
     conductor = conductor_service.conductor_de_usuario(db, usuario.usuario_id)
-    return saldo_service.confirmar_recarga(db, recarga_id, conductor.id)
+    recarga = saldo_service.confirmar_recarga(db, recarga_id, conductor.id)
+    # Con saldo recien acreditado, este conductor puede volver a aparecer en
+    # "motos disponibles cerca": avisa a todos los clientes buscando moto.
+    await realtime_manager.notificar_a_todos_los_clientes({"tipo": "conductores_actualizados"})
+    return recarga
 
 
 @router.get("/historial", response_model=list[ViajeOut])

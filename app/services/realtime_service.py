@@ -103,5 +103,21 @@ class RealtimeManager:
             self.desconectar_cliente(usuario_id)
             return False
 
+    async def notificar_a_todos_los_clientes(self, datos: dict) -> int:
+        """Empuja un evento a TODOS los clientes conectados (ej: cambio de
+        disponibilidad de un conductor). El cliente reacciona re-consultando
+        las motos cercanas a su ubicacion. Devuelve cuantos recibieron."""
+        enviados = 0
+        caidos = []
+        for usuario_id, ws in list(self._clientes.items()):
+            try:
+                await ws.send_json(datos)
+                enviados += 1
+            except Exception:
+                caidos.append(usuario_id)
+        for usuario_id in caidos:
+            self.desconectar_cliente(usuario_id)
+        return enviados
+
 
 realtime_manager = RealtimeManager()

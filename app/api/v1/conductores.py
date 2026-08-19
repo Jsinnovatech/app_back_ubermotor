@@ -14,6 +14,7 @@ from app.schemas.conductor import (
 from app.schemas.recarga import PaqueteOut, RecargaOut, ComprarRecargaIn
 from app.schemas.viaje import ViajeConRiderOut
 from app.services.conductor_service import conductor_service
+from app.services.realtime_service import realtime_manager
 from app.services.saldo_service import saldo_service
 from app.services.viaje_service import viaje_service
 
@@ -93,7 +94,11 @@ async def cambiar_disponibilidad(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_tipo("conductor")),
 ):
-    return conductor_service.cambiar_disponibilidad(db, usuario.usuario_id, datos.disponible)
+    conductor = conductor_service.cambiar_disponibilidad(db, usuario.usuario_id, datos.disponible)
+    # Se prendio o apago en el mapa: avisa a todos los clientes buscando moto
+    # para que refresquen "motos disponibles cerca" al instante.
+    await realtime_manager.notificar_a_todos_los_clientes({"tipo": "conductores_actualizados"})
+    return conductor
 
 
 @router.put("/ubicacion")
