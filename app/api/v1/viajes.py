@@ -150,6 +150,37 @@ async def ruta_viaje(
     return {"viaje_id": viaje_id, "puntos": puntos or []}
 
 
+@router.get("/{viaje_id}/ruta-conductor")
+async def ruta_conductor_a_recojo(
+    viaje_id: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_tipo("conductor", "cliente")),
+):
+    """Ruta real por calles (OSRM) desde la posicion EN VIVO del conductor
+    hasta el punto de recojo del cliente. Se recalcula en cada llamada porque
+    el conductor se mueve; solo tiene sentido mientras va camino al recojo
+    (asignado/llegado) - en 'en_curso' ya recogio al cliente y esa ruta ya
+    no aplica (se usa la ruta fija origen->destino de /ruta)."""
+    viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
+    if not viaje:
+        from app.core.exceptions import NotFoundException
+
+        raise NotFoundException(message="Viaje no encontrado")
+
+    if viaje.estado not in ("asignado", "llegado") or not viaje.conductor_id:
+        return {"viaje_id": viaje_id, "puntos": []}
+
+    conductor = db.query(Conductor).filter(Conductor.id == viaje.conductor_id).first()
+    if not conductor or conductor.ubicacion_lat is None or conductor.ubicacion_lng is None:
+        return {"viaje_id": viaje_id, "puntos": []}
+
+    puntos = await routing_service.ruta(
+        conductor.ubicacion_lat, conductor.ubicacion_lng,
+        viaje.origen_lat, viaje.origen_lng,
+    )
+    return {"viaje_id": viaje_id, "puntos": puntos or []}
+
+
 @router.post("/{viaje_id}/aceptar", response_model=ViajeOut)
 async def aceptar(
     viaje_id: int,
