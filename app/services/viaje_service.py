@@ -1,3 +1,4 @@
+import logging
 from math import asin, cos, radians, sin, sqrt
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,8 @@ from app.models.viaje import Viaje
 from app.models.viaje_oferta import ViajeOferta
 from app.models.vehiculo import Vehiculo
 from app.services.saldo_service import saldo_service
+
+logger = logging.getLogger(__name__)
 
 
 def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -88,6 +91,7 @@ class ViajeService:
 
     @staticmethod
     def solicitar(db: Session, cliente_id: int, datos) -> Viaje:
+        logger.info(f"Cliente {cliente_id} solicita un viaje")
         # Regla: un cliente solo puede tener UNA carrera activa a la vez
         # (solicitado/asignado/llegado/en_curso). Evita pedir de nuevo.
         tiene_activa = (
@@ -128,6 +132,7 @@ class ViajeService:
     def aceptar(db: Session, viaje_id: int, conductor_id: int) -> Viaje:
         """El conductor acepta: se consume 1 carrera de su saldo. Un conductor
         solo puede tener UNA carrera activa (asignada o en curso) a la vez."""
+        logger.info(f"Conductor {conductor_id} acepta el viaje {viaje_id}")
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -167,6 +172,7 @@ class ViajeService:
     def rechazar(db: Session, viaje_id: int, conductor_id: int) -> Viaje:
         """El conductor rechaza: registra el rechazo (cada 3 -> -1 saldo) y
         el viaje vuelve a quedar 'solicitado' para que otro conductor lo tome."""
+        logger.info(f"Conductor {conductor_id} rechaza el viaje {viaje_id}")
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -184,6 +190,7 @@ class ViajeService:
     def llegar(db: Session, viaje_id: int, conductor_id: int) -> Viaje:
         """El conductor puso 'Llegue': el viaje pasa a estado 'llegado' y el
         cliente ve que su conductor ya esta esperando en el punto de recogida."""
+        logger.info(f"Conductor {conductor_id} llego al punto de recojo del viaje {viaje_id}")
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -199,6 +206,7 @@ class ViajeService:
     @staticmethod
     def iniciar(db: Session, viaje_id: int) -> Viaje:
         """El conductor ya recogio al cliente: el viaje pasa a 'en_curso'."""
+        logger.info(f"Viaje {viaje_id} inicia (en_curso)")
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -213,6 +221,7 @@ class ViajeService:
     def completar(db: Session, viaje_id: int) -> Viaje:
         """Cierra el viaje como 'completado' y suma el contador de viajes
         tanto al conductor como al cliente."""
+        logger.info(f"Viaje {viaje_id} completado")
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -233,6 +242,7 @@ class ViajeService:
 
     @staticmethod
     def cancelar(db: Session, viaje_id: int, quien: str) -> Viaje:
+        logger.info(f"Viaje {viaje_id} cancelado por {quien}")
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
