@@ -198,6 +198,7 @@ class ViajeService:
 
     @staticmethod
     def iniciar(db: Session, viaje_id: int) -> Viaje:
+        """El conductor ya recogio al cliente: el viaje pasa a 'en_curso'."""
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -210,6 +211,8 @@ class ViajeService:
 
     @staticmethod
     def completar(db: Session, viaje_id: int) -> Viaje:
+        """Cierra el viaje como 'completado' y suma el contador de viajes
+        tanto al conductor como al cliente."""
         viaje = db.query(Viaje).filter(Viaje.id == viaje_id).first()
         if not viaje:
             raise NotFoundException(message="Viaje no encontrado")
@@ -385,6 +388,7 @@ class ViajeService:
 
     @staticmethod
     def historial_cliente(db: Session, cliente_id: int) -> list[Viaje]:
+        """Ultimos 50 viajes del cliente, sin serializar (sin info del conductor)."""
         return (
             db.query(Viaje)
             .filter(Viaje.cliente_id == cliente_id)
